@@ -156,7 +156,7 @@ describe("station search", () => {
       modelBaseUrl: "https://model.test",
     });
     expect(snap.source).toBe("open-meteo-cams-model");
-    expect(snap.sourceNote).toMatch(/has not reported recently \(last reading 2020-10-13\)/);
+    expect(snap.sourceNote).toMatch(/within 100 km has reported recently.*last reported 2020-10-13/);
     expect(snap.readings.find((r) => r.parameter === "pm25")?.value).toBe(38.2);
   });
 });
