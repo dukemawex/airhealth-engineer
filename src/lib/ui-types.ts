@@ -4,6 +4,7 @@
  */
 import type { UIMessage } from "ai";
 import type { Approval } from "./domain";
+import type { VisionResult } from "./vision/scene";
 
 export type ApprovalView = Pick<
   Approval,
@@ -29,7 +30,12 @@ export type AgentDataParts = {
   run: RunData;
 };
 
-export type AgentUIMessage = UIMessage<never, AgentDataParts>;
+/** Client-side metadata on user turns (a photo shared with that message). Never persisted server-side. */
+export interface AgentMessageMeta {
+  scene?: { imageUrl?: string; result: VisionResult; kind?: "photo" | "video_frame" };
+}
+
+export type AgentUIMessage = UIMessage<AgentMessageMeta, AgentDataParts>;
 
 export const toApprovalView = (a: Approval): ApprovalView => ({
   id: a.id,

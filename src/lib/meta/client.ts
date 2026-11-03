@@ -52,7 +52,12 @@ const ResponseSchema = z.object({
     )
     .min(1),
   usage: z
-    .object({ prompt_tokens: z.number(), completion_tokens: z.number(), total_tokens: z.number() })
+    .object({
+      prompt_tokens: z.number(),
+      completion_tokens: z.number(),
+      total_tokens: z.number(),
+      completion_tokens_details: z.object({ reasoning_tokens: z.number().optional() }).nullable().optional(),
+    })
     .partial()
     .optional(),
 });
@@ -94,7 +99,7 @@ export class MetaModelClient implements ModelClient {
       ...(req.tools && req.tools.length > 0
         ? { tool_choice: "auto" as const, parallel_tool_calls: this.cfg.parallelToolCalls }
         : {}),
-      ...(this.cfg.reasoningEffort ? { reasoning_effort: this.cfg.reasoningEffort } : {}),
+      ...(!req.reasoning_effort && this.cfg.reasoningEffort ? { reasoning_effort: this.cfg.reasoningEffort } : {}),
     };
     const url = `${this.cfg.baseUrl}/chat/completions`;
 
@@ -181,10 +186,11 @@ export class MetaModelClient implements ModelClient {
       model: this.cfg.modelId,
       ...req,
       stream: true,
+      stream_options: { include_usage: true },
       ...(req.tools && req.tools.length > 0
         ? { tool_choice: "auto" as const, parallel_tool_calls: this.cfg.parallelToolCalls }
         : {}),
-      ...(this.cfg.reasoningEffort ? { reasoning_effort: this.cfg.reasoningEffort } : {}),
+      ...(!req.reasoning_effort && this.cfg.reasoningEffort ? { reasoning_effort: this.cfg.reasoningEffort } : {}),
     };
     const url = `${this.cfg.baseUrl}/chat/completions`;
 
@@ -289,7 +295,12 @@ const StreamChunkSchema = z.object({
     )
     .default([]),
   usage: z
-    .object({ prompt_tokens: z.number(), completion_tokens: z.number(), total_tokens: z.number() })
+    .object({
+      prompt_tokens: z.number(),
+      completion_tokens: z.number(),
+      total_tokens: z.number(),
+      completion_tokens_details: z.object({ reasoning_tokens: z.number().optional() }).nullable().optional(),
+    })
     .partial()
     .nullable()
     .optional(),

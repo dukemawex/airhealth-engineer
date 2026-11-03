@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { parseBody, route } from "@/lib/api";
 import { sessionToUIMessages, streamAgentRun } from "@/lib/agent/uiStream";
-import { HealthProfileSchema, LocationQuerySchema } from "@/lib/domain";
+import { HealthProfileSchema, LocationQuerySchema, SessionSceneSchema } from "@/lib/domain";
 import { AppError } from "@/lib/errors";
 import { getRunner } from "@/lib/runtime";
 
@@ -21,6 +21,8 @@ const Body = z
     resume: z.boolean().optional(),
     location: LocationQuerySchema.optional(),
     profile: HealthProfileSchema.optional(),
+    /** Structured photo analysis from /api/vision (no image bytes). */
+    scene: SessionSceneSchema.optional(),
   })
   .refine((b) => Boolean(b.message) !== Boolean(b.resume), { message: "Provide exactly one of message or resume" });
 
@@ -32,6 +34,7 @@ export const POST = route("agent.stream", async ({ req, log, requestId }) => {
   if (!conversationId) {
     const session = await runner.createSession({ location: body.location, profile: body.profile });
     conversationId = session.id;
+    if (body.scene) await runner.updateContext(conversationId, { scene: body.scene });
   } else {
     const session = await runner.getSession(conversationId);
     if (session.pendingTurn || session.status === "awaiting_approval") {
@@ -39,7 +42,9 @@ export const POST = route("agent.stream", async ({ req, log, requestId }) => {
         pendingApprovalIds: session.pendingTurn?.approvalIds ?? [],
       });
     }
-    if (body.location || body.profile) await runner.updateContext(conversationId, { location: body.location, profile: body.profile });
+    if (body.location || body.profile || body.scene) {
+      await runner.updateContext(conversationId, { location: body.location, profile: body.profile, scene: body.scene });
+    }
   }
 
   const id = conversationId;

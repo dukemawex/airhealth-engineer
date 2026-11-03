@@ -168,7 +168,7 @@ export function sessionToUIMessages(session: Session, approvals: Approval[]): Ag
   session.messages.forEach((m, i) => {
     if (m.role === "user") {
       current = null;
-      out.push({ id: `${session.id}_m${i}`, role: "user", parts: [{ type: "text", text: m.content }] });
+      out.push({ id: `${session.id}_m${i}`, role: "user", parts: [{ type: "text", text: userText(m.content) }] });
       return;
     }
     if (m.role === "assistant") {
@@ -202,4 +202,8 @@ export function sessionToUIMessages(session: Session, approvals: Approval[]): Ag
     if (part) Object.assign(part, { state: "output-available", output: parse(raw) });
   }
   return out;
+}
+
+function userText(content: string | Array<{ type: string; text?: string }>): string {
+  return typeof content === "string" ? content : content.map((p) => (p.type === "text" ? p.text ?? "" : "")).join("\n");
 }

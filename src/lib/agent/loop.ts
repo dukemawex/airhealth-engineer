@@ -1,7 +1,7 @@
 import type { AppConfig } from "../config";
 import { createDeviceAdapter, type DeviceAdapter } from "../devices";
 import type { MonitoringDecision } from "../domain";
-import type { Approval, DeviceActionResult, HealthProfile, Intervention, LocationQuery, Session } from "../domain";
+import type { Approval, DeviceActionResult, HealthProfile, Intervention, LocationQuery, Session, SessionScene } from "../domain";
 import { AppError, UpstreamError, errorMessage } from "../errors";
 import { withTimeout, type FetchLike } from "../http";
 import { newId } from "../ids";
@@ -206,7 +206,7 @@ export class AgentRunner {
   /** Update location and/or health context shared from the UI (not via chat). */
   async updateContext(
     sessionId: string,
-    input: { profile?: HealthProfile; location?: LocationQuery; replaceProfile?: boolean },
+    input: { profile?: HealthProfile; location?: LocationQuery; replaceProfile?: boolean; scene?: SessionScene },
   ): Promise<Session> {
     await this.getSession(sessionId);
     return withLock(this.deps.store, this.lockKey(sessionId), 30_000, async () => {
@@ -219,6 +219,7 @@ export class AgentRunner {
         await this.deps.store.addMonitoredSession(session.id).catch(() => undefined);
       }
       if (input.profile) session.profile = mergeProfile(session.profile, input.profile, input.replaceProfile ?? false);
+      if (input.scene) session.scene = input.scene;
       await this.save(session);
       return session;
     });

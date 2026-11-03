@@ -4,7 +4,10 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StatusReport } from "@/lib/agent/status";
-import type { HealthProfile, LocationQuery } from "@/lib/domain";
+import type { HealthProfile, LocationQuery, SessionScene } from "@/lib/domain";
+import type { VisionResult } from "@/lib/vision/scene";
+import { prepareMedia } from "@/lib/client/media";
+import { SceneProgress } from "./cards/SceneCard";
 import { ApiError, apiFetch, authHeaders, conversationStore, fetchJsonLoose, tokenStore } from "@/lib/client/api";
 import { getSpeakPreference, speak, stopSpeaking } from "@/lib/client/speech";
 import type { AgentUIMessage, ApprovalView } from "@/lib/ui-types";
@@ -29,7 +32,7 @@ const MONITOR_POLL_MS = 5 * 60_000;
 type SendBody =
   | { approval: { id: string; decision: "approve" | "reject"; note?: string } }
   | { resume: true }
-  | { location?: LocationQuery; profile?: HealthProfile };
+  | { location?: LocationQuery; profile?: HealthProfile; scene?: SessionScene };
 
 type HealthResponse = { status?: string; checks?: { metaModelApi?: { configured?: boolean; model?: string } } };
 type MonitorResponse = { checked: boolean; notified?: boolean; reason?: string };
@@ -80,6 +83,7 @@ function createConnection() {
           message: text,
           location: "location" in b ? b.location : undefined,
           profile: "profile" in b ? b.profile : undefined,
+          scene: "scene" in b ? b.scene : undefined,
         },
         headers,
       };
@@ -282,10 +286,43 @@ export function AgentApp() {
     if (el && stick.current) el.scrollTop = el.scrollHeight;
   }, [messages, busy]);
 
-  const send = (text: string, location?: LocationQuery, profile?: HealthProfile) => {
+  const send = (text: string, location?: LocationQuery, profile?: HealthProfile, shared?: { imageUrl: string; result: VisionResult; kind: "photo" | "video_frame" }) => {
     setBanner(null);
     stopSpeaking();
-    void sendMessage({ text }, { body: { location, profile } satisfies SendBody });
+    const scene: SessionScene | undefined = shared && {
+      capturedAt: new Date().toISOString(),
+      analysis: shared.result.analysis,
+      overlay: { source: shared.result.overlay.source, labels: [...new Set(shared.result.overlay.regions.map((r) => r.label))].slice(0, 12) },
+    };
+    void sendMessage(
+      { text, ...(shared ? { metadata: { scene: shared } } : {}) },
+      { body: { location, profile, scene } satisfies SendBody },
+    );
+  };
+
+  // Photo / video -> /api/vision (Muse Spark json_schema + SAM 3.1) -> agent turn with the structured scene.
+  const [visionJob, setVisionJob] = useState<{ imageUrl?: string; stage: string; error?: string } | null>(null);
+  const analyzeMedia = async (file: File, note: string) => {
+    setBanner(null);
+    setVisionJob({ stage: "Preparing your photo…" });
+    try {
+      const img = await prepareMedia(file);
+      setVisionJob({ imageUrl: img.dataUrl, stage: img.kind === "video_frame" ? "Muse Spark is reading a frame from your video…" : "Muse Spark is reading the scene…" });
+      const result = await apiFetch<VisionResult>("/api/vision", {
+        method: "POST",
+        body: JSON.stringify({ image: img.dataUrl, width: img.width, height: img.height, note: note || undefined, place: newsPlace }),
+      });
+      setVisionJob(null);
+      const text =
+        note ||
+        (img.kind === "video_frame"
+          ? "Here's a frame from a video of my space. Use what you see to engineer my indoor air."
+          : "Here's a photo of my space. Use what you see to engineer my indoor air.");
+      send(text, undefined, undefined, { imageUrl: img.dataUrl, result, kind: img.kind });
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) setAccessOpen(true);
+      setVisionJob((j) => ({ imageUrl: j?.imageUrl, stage: "", error: err instanceof Error ? err.message : "Photo analysis failed" }));
+    }
   };
   const decide = (a: ApprovalView, decision: "approve" | "reject", note?: string) => {
     setReviewing(null);
@@ -424,6 +461,9 @@ export function AgentApp() {
                     ))}
                   </>
                 )}
+                {visionJob && (
+                  <SceneProgress imageUrl={visionJob.imageUrl} stage={visionJob.stage} error={visionJob.error} onDismiss={() => setVisionJob(null)} />
+                )}
                 {chatStatus === "submitted" && <LoadingState />}
                 {banner && (
                   <div className="banner" data-tone="error" role="alert">
@@ -438,9 +478,10 @@ export function AgentApp() {
               </div>
             </div>
             <Composer
-              disabled={busy || pending.length > 0 || restoring}
+              disabled={busy || pending.length > 0 || restoring || Boolean(visionJob && !visionJob.error)}
               busy={busy}
               onSend={(t, profile) => send(t, undefined, profile)}
+              onAttach={(f, note) => void analyzeMedia(f, note)}
               showHealthChips={messages.length > 0}
               onStop={stop}
               disabledReason={pending.length > 0 ? "Approve or reject the pending device action to continue." : undefined}

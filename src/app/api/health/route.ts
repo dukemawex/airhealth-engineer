@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { route } from "@/lib/api";
 import { ConfigError, getConfig } from "@/lib/config";
+import { getCapabilities } from "@/lib/meta/media";
 import { getStore } from "@/lib/storage";
 
 export const runtime = "nodejs";
@@ -9,7 +10,7 @@ export const dynamic = "force-dynamic";
 /** Public liveness + configuration presence. Never returns secret values. */
 export const GET = route(
   "health",
-  async () => {
+  async ({ log: logger }) => {
     let config;
     try {
       config = getConfig();
@@ -20,7 +21,10 @@ export const GET = route(
       );
     }
     const store = getStore(config.storage);
-    const storageOk = await store.ping().catch(() => false);
+    const [storageOk, caps] = await Promise.all([
+      store.ping().catch(() => false),
+      config.meta.apiKey ? getCapabilities({ cfg: config.meta, logger }).catch(() => undefined) : Promise.resolve(undefined),
+    ]);
     const devicesConfigured =
       config.devices.adapter === "sandbox" ||
       (config.devices.adapter === "homeassistant" && Boolean(config.devices.homeAssistantUrl && config.devices.homeAssistantToken)) ||
@@ -34,6 +38,9 @@ export const GET = route(
         time: new Date().toISOString(),
         checks: {
           metaModelApi: { configured: metaConfigured, model: config.meta.modelId, baseUrl: config.meta.baseUrl },
+          metaCapabilities: caps
+            ? { reachable: caps.reachable, checkedAt: caps.checkedAt, features: caps.features }
+            : { reachable: false, features: null },
           openaq: { configured: Boolean(config.airQuality.openaqApiKey), modelFallbackEnabled: config.airQuality.modelFallback },
           storage: { kind: store.kind, reachable: storageOk, durable: store.kind === "redis" },
           devices: { adapter: config.devices.adapter, configured: devicesConfigured },

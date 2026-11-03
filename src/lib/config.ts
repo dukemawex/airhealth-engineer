@@ -31,7 +31,7 @@ const EnvSchema = z.object({
   ),
   META_REASONING_EFFORT: z.preprocess(
     emptyToUndefined,
-    z.enum(["minimal", "low", "medium", "high", "xhigh"]).optional(),
+    z.enum(["minimal", "low", "medium", "high", "xhigh", "max"]).optional(),
   ),
   META_PARALLEL_TOOL_CALLS: boolFromEnv,
   META_TIMEOUT_MS: intFromEnv(55_000, 1_000, 300_000),

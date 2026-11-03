@@ -138,7 +138,8 @@ describe("e2e: autonomous loop over HTTP with a scripted Muse Spark", () => {
     expect(chunks.some((c) => c.type === "text-delta" && String(c.delta).length > 0)).toBe(true);
 
     // Wire format sent to the Meta Model API.
-    const first = meta.requests[0]!;
+    const chatRequests = meta.requests.filter((r) => r.path === "/chat/completions");
+    const first = chatRequests[0]!;
     expect(first.path).toBe("/chat/completions");
     expect(first.headers.authorization).toBe("Bearer LLM_e2e_test_key");
     expect(first.body?.model).toBe("muse-spark-1.3");
@@ -149,7 +150,7 @@ describe("e2e: autonomous loop over HTTP with a scripted Muse Spark", () => {
       ["designIntervention", "executeDeviceAction", "getAirQuality", "getHealthContext", "getStatus"].sort(),
     );
     // Each tool result answers its call id.
-    const toolMsgs = (meta.requests[1]!.body!.messages as ChatMessage[]).filter((m) => m.role === "tool");
+    const toolMsgs = (chatRequests[1]!.body!.messages as ChatMessage[]).filter((m) => m.role === "tool");
     expect(toolMsgs).toHaveLength(2);
     expect(data.requests.some((r) => r.path.startsWith("/geo/search?name=Lagos"))).toBe(true);
   });
@@ -170,7 +171,8 @@ describe("e2e: autonomous loop over HTTP with a scripted Muse Spark", () => {
   });
 
   it("approve (streamed) executes in the sandbox and resumes the conversation", async () => {
-    const before = meta.requests.length;
+    const chats = () => meta.requests.filter((r) => r.path === "/chat/completions");
+    const before = chats().length;
     const { POST } = await import("@/app/api/approvals/[approvalId]/approve/route");
     const res = await POST(
       req(`/api/approvals/${approvalId}/approve?stream=ui`, { method: "POST", body: { decidedBy: "e2e" } }),
@@ -182,8 +184,8 @@ describe("e2e: autonomous loop over HTTP with a scripted Muse Spark", () => {
     expect(decided.data.status).toBe("executed");
     const text = chunks.filter((c) => c.type === "text-delta").map((c) => c.delta).join("");
     expect(text).toContain("purifier is running");
-    expect(meta.requests.length).toBe(before + 1);
-    const toolMsg = (meta.requests.at(-1)!.body!.messages as ChatMessage[]).at(-1)!;
+    expect(chats().length).toBe(before + 1);
+    const toolMsg = (chats().at(-1)!.body!.messages as ChatMessage[]).at(-1)!;
     expect(toolMsg.role).toBe("tool");
     expect(JSON.parse(toolMsg.content!).status).toBe("executed");
   });

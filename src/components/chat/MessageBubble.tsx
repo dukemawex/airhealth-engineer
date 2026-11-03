@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import type { AgentUIMessage, ApprovalView, NoticeData } from "@/lib/ui-types";
 import { ApprovalRequestCard } from "../cards/ApprovalRequestCard";
 import { ToolResultCard, type ToolPartView } from "../cards/ToolResultCard";
+import { SceneCard } from "../cards/SceneCard";
 
 export function NoticeCard({ notice, onRetry, busy }: { notice: NoticeData; onRetry?: () => void; busy?: boolean }) {
   return (
@@ -24,7 +25,9 @@ export function MessageBubble({
   busy,
   onReviewApproval,
   onRetry,
+  judge = false,
 }: {
+  judge?: boolean;
   message: AgentUIMessage;
   history: Array<{ at: string; pm25?: number }>;
   busy: boolean;
@@ -39,6 +42,9 @@ export function MessageBubble({
           You
         </span>
         <div className="bubble">{text}</div>
+        {message.metadata?.scene && (
+          <SceneCard imageUrl={message.metadata.scene.imageUrl} result={message.metadata.scene.result} judge={judge} />
+        )}
       </article>
     );
   }

@@ -12,9 +12,25 @@ export interface ToolCall {
 
 export type ChatMessage =
   | { role: "developer" | "system"; content: string }
-  | { role: "user"; content: string }
+  | { role: "user"; content: string | UserContentPart[] }
   | { role: "assistant"; content: string | null; tool_calls?: ToolCall[] }
   | { role: "tool"; tool_call_id: string; content: string };
+
+/**
+ * Multimodal user content (Chat Completions). Images go in user messages only,
+ * as data: URLs or https URLs. https://dev.meta.ai/docs/image-understanding
+ */
+export type UserContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string; detail?: "low" | "high" | "auto" } };
+
+export type ReasoningEffort = "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+
+/** Constrained decoding: https://dev.meta.ai/docs/structured-outputs */
+export interface JsonSchemaResponseFormat {
+  type: "json_schema";
+  json_schema: { name: string; schema: Record<string, unknown>; strict?: boolean; description?: string };
+}
 
 export interface FunctionToolDefinition {
   type: "function";
@@ -32,10 +48,12 @@ export interface ChatCompletionRequest {
   /** Meta Model API only supports "auto". */
   tool_choice?: "auto";
   parallel_tool_calls?: boolean;
-  reasoning_effort?: "minimal" | "low" | "medium" | "high" | "xhigh";
+  reasoning_effort?: ReasoningEffort;
+  response_format?: JsonSchemaResponseFormat;
   max_completion_tokens?: number;
   safety_identifier?: string;
   stream?: boolean;
+  stream_options?: { include_usage?: boolean };
 }
 
 export interface ChatCompletionResponse {
@@ -48,7 +66,12 @@ export interface ChatCompletionResponse {
     message: { role: "assistant"; content: string | null; tool_calls?: ToolCall[] };
     finish_reason: "stop" | "tool_calls" | "length" | "content_filter" | string;
   }>;
-  usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+    completion_tokens_details?: { reasoning_tokens?: number };
+  };
 }
 
 /** The minimal interface the agent loop depends on; mocked in tests. */

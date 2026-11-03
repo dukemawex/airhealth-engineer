@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SceneAnalysisSchema } from "./vision/scene";
 import type { ChatMessage, ToolCall } from "./meta/types";
 
 /* ------------------------------------------------------------------ */
@@ -324,7 +325,19 @@ export interface Session {
   monitoring?: MonitoringState;
   /** Opaque, stable end-user id hint forwarded as safety_identifier (hashed). */
   userRef?: string;
+  /** Latest photo analysis (structured output only; the image itself is never stored). */
+  scene?: SessionScene;
 }
+
+export const SessionSceneSchema = z.object({
+  capturedAt: z.string().max(40),
+  analysis: SceneAnalysisSchema,
+  overlay: z.object({
+    source: z.enum(["sam-3.1", "muse-spark-grounding"]),
+    labels: z.array(z.string().max(80)).max(12),
+  }),
+});
+export type SessionScene = z.infer<typeof SessionSceneSchema>;
 
 export interface MonitoringDecision {
   at: string;

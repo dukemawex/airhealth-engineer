@@ -24,6 +24,15 @@ function SpeakerIcon({ on }: { on: boolean }) {
   );
 }
 
+function CameraIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z" />
+      <circle cx="12" cy="13.5" r="3.5" />
+    </svg>
+  );
+}
+
 export function Composer({
   disabled,
   busy,
@@ -31,7 +40,10 @@ export function Composer({
   onStop,
   disabledReason,
   showHealthChips = false,
+  onAttach,
 }: {
+  /** Photo or video chosen: the current text is passed along as the note. */
+  onAttach?: (file: File, note: string) => void;
   disabled: boolean;
   busy: boolean;
   onSend: (text: string, profile?: HealthProfile) => void;
@@ -42,6 +54,7 @@ export function Composer({
   const [text, setText] = useState("");
   const [chipsOpen, setChipsOpen] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const dictation = useDictation((heard) => {
     if (!heard) return;
     setText((t) => (t.trim() ? `${t.trimEnd()} ${heard}` : heard));
@@ -105,6 +118,36 @@ export function Composer({
             {dictation.listening ? dictation.interim || "Listening…" : ""}
           </p>
         </div>
+        {onAttach && (
+          <>
+            <button
+              type="button"
+              className="btn btn-secondary icon-btn attach-btn"
+              onClick={() => fileRef.current?.click()}
+              disabled={disabled}
+              aria-label="Add a photo or video of your space"
+              title="Snap or upload a photo or short video of your space"
+            >
+              <CameraIcon />
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*,video/*"
+              hidden
+              tabIndex={-1}
+              aria-hidden="true"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (!f || disabled) return;
+                if (dictation.listening) dictation.stop();
+                onAttach(f, text.trim());
+                setText("");
+              }}
+            />
+          </>
+        )}
         {dictation.supported && (
           <button
             type="button"
