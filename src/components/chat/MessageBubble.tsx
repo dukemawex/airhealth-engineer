@@ -5,6 +5,7 @@ import type { AgentUIMessage, ApprovalView, NoticeData } from "@/lib/ui-types";
 import { ApprovalRequestCard } from "../cards/ApprovalRequestCard";
 import { ToolResultCard, type ToolPartView } from "../cards/ToolResultCard";
 import { SceneCard } from "../cards/SceneCard";
+import { ReasoningTimeline } from "../judge/ReasoningTimeline";
 
 export function NoticeCard({ notice, onRetry, busy }: { notice: NoticeData; onRetry?: () => void; busy?: boolean }) {
   return (
@@ -48,6 +49,7 @@ export function MessageBubble({
       </article>
     );
   }
+  const traces = message.parts.flatMap((p) => (p.type === "data-trace" ? [p.data] : []));
   return (
     <article className="msg msg-assistant" aria-label="AirHealth Engineer replied">
       <div className="byline" aria-hidden="true">
@@ -76,6 +78,7 @@ export function MessageBubble({
         }
         return null;
       })}
+      <ReasoningTimeline traces={traces} judge={judge} />
     </article>
   );
 }

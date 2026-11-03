@@ -14,6 +14,9 @@ import type { AgentUIMessage, ApprovalView } from "@/lib/ui-types";
 import { ApprovalModal } from "./cards/ApprovalModal";
 import { Composer } from "./chat/Composer";
 import { MessageBubble } from "./chat/MessageBubble";
+import { JudgePanel } from "./judge/JudgePanel";
+import { useJudgeMode } from "@/lib/client/judge";
+import { totalTraces } from "@/lib/traceStats";
 import { AccessDialog } from "./layout/AccessDialog";
 import { LeftRail, type RailSection } from "./layout/LeftRail";
 import { Masthead } from "./layout/Masthead";
@@ -301,6 +304,7 @@ export function AgentApp() {
   };
 
   // Photo / video -> /api/vision (Muse Spark json_schema + SAM 3.1) -> agent turn with the structured scene.
+  const judge = useJudgeMode();
   const [visionJob, setVisionJob] = useState<{ imageUrl?: string; stage: string; error?: string } | null>(null);
   const analyzeMedia = async (file: File, note: string) => {
     setBanner(null);
@@ -398,6 +402,7 @@ export function AgentApp() {
   const newsPlace = status?.location?.name ?? status?.location?.area ?? undefined;
   const monitoringOn = Boolean(status?.monitoring?.enabled && status.location);
   const lastIsUser = messages.at(-1)?.role === "user";
+  const traceTotals = totalTraces(messages.flatMap((m) => m.parts.flatMap((p) => (p.type === "data-trace" ? [p.data] : []))));
 
   return (
     <div className="app">
@@ -416,6 +421,8 @@ export function AgentApp() {
         onHowItWorks={() => setHowOpen(true)}
         onNew={newConversation}
         hasConversation={Boolean(conversationId || messages.length)}
+        judge={judge.on}
+        onToggleJudge={judge.toggle}
       />
       <div className="workspace">
         <LeftRail active={howOpen ? "how" : railSection} onSelect={selectRail} pendingCount={pending.length} />
@@ -429,6 +436,7 @@ export function AgentApp() {
                 stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
               }}
             >
+              {judge.on && <JudgePanel totals={traceTotals} onClose={() => judge.set(false)} />}
               <div className="chat-inner" role="log" aria-live="polite" aria-busy={busy} aria-label="Conversation">
                 {restoring ? (
                   <LoadingState label="Restoring your conversation" />
@@ -457,6 +465,7 @@ export function AgentApp() {
                         busy={busy}
                         onReviewApproval={setReviewing}
                         onRetry={retry}
+                        judge={judge.on}
                       />
                     ))}
                   </>

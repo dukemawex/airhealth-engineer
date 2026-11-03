@@ -23,7 +23,23 @@ export interface RunData {
   iterations: number;
 }
 
+/** One Muse Spark reasoning step, for the reasoning timeline and Judge mode. */
+export interface StepTrace {
+  iteration: number;
+  model: string;
+  reasoningEffort: string | null;
+  startedAt: string;
+  /** Wall-clock time Muse Spark took for this step (request to final token). */
+  modelMs: number;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  reasoningTokens: number | null;
+  outcome: "tool_calls" | "answer" | "awaiting_approval";
+  tools: Array<{ id: string; name: string; ms: number; status: "ok" | "error" | "pending_approval" }>;
+}
+
 export type AgentDataParts = {
+  trace: StepTrace;
   approval: ApprovalView;
   conversation: { id: string };
   notice: NoticeData;

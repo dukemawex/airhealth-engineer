@@ -33,7 +33,11 @@ export function Masthead({
   onHowItWorks,
   onNew,
   hasConversation,
+  judge,
+  onToggleJudge,
 }: {
+  judge?: boolean;
+  onToggleJudge?: () => void;
   agentOnline: boolean | null;
   agentDetail: string;
   monitoring: boolean;
@@ -75,6 +79,21 @@ export function Masthead({
           </span>
         </div>
         <div className="masthead-actions">
+          {onToggleJudge && (
+            <button
+              type="button"
+              className="btn btn-secondary judge-toggle"
+              onClick={onToggleJudge}
+              aria-pressed={Boolean(judge)}
+              aria-label="Judge mode"
+              title="Judge mode: show live reasoning telemetry and which Meta endpoints are live"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 12h4l3-8 4 16 3-8h4" />
+              </svg>
+              <span className="btn-label">Judge mode</span>
+            </button>
+          )}
           <button type="button" className="btn btn-secondary" onClick={onHowItWorks} aria-haspopup="dialog" aria-label="How it works">
             <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <circle cx="12" cy="12" r="9" />

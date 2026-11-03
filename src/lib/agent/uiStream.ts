@@ -3,7 +3,7 @@ import { ConfigError } from "../config";
 import type { Approval, Session } from "../domain";
 import { AppError, TimeoutError, UpstreamError, errorMessage } from "../errors";
 import type { Logger } from "../logger";
-import { toApprovalView, type AgentUIMessage, type NoticeData } from "../ui-types";
+import { toApprovalView, type AgentUIMessage, type NoticeData, type StepTrace } from "../ui-types";
 import type { RunEvents, RunResult } from "./loop";
 
 /**
@@ -88,6 +88,9 @@ class StreamBridge implements RunEvents {
   onApprovalDecided(a: Approval, toolResult: Record<string, unknown>) {
     this.w.write({ type: "data-approval", id: a.id, data: toApprovalView(a) });
     this.w.write({ type: "tool-output-available", toolCallId: a.toolCallId, output: toolResult, dynamic: true });
+  }
+  onTrace(t: StepTrace) {
+    this.w.write({ type: "data-trace", id: `trace_${t.startedAt}_${t.iteration}`, data: t });
   }
   finish() {
     this.closeText();

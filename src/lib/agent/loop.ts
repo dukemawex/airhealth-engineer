@@ -8,6 +8,7 @@ import { newId } from "../ids";
 import type { Logger } from "../logger";
 import { hashSafetyIdentifier } from "../meta/client";
 import type { ChatMessage, ModelClient, ToolCall } from "../meta/types";
+import type { StepTrace } from "../ui-types";
 import { fetchAirQuality } from "../services/airQuality";
 import { geocodeDepsFromConfig, resolveLocation } from "../services/geocode";
 import { decideNotification } from "./monitor";
@@ -62,6 +63,8 @@ export interface RunEvents {
   onToolResult?(result: { id: string; name: string; ok: boolean; output: unknown }): void;
   onApprovalRequested?(approval: Approval): void;
   onApprovalDecided?(approval: Approval, toolResult: Record<string, unknown>): void;
+  /** Per-step telemetry (model latency, token usage incl. reasoning tokens, tool timings). */
+  onTrace?(trace: StepTrace): void;
 }
 
 const parseJsonOr = (raw: string) => {
@@ -386,6 +389,7 @@ export class AgentRunner {
           safety_identifier: hashSafetyIdentifier(session.userRef ?? session.id),
         };
         events?.onStepStart?.(iteration);
+        const stepStarted = Date.now();
         const response =
           events?.onTextDelta && this.deps.model.streamChatCompletion
             ? await this.deps.model.streamChatCompletion(request, { onTextDelta: (d) => events.onTextDelta?.(d) })
@@ -398,6 +402,19 @@ export class AgentRunner {
           throw new UpstreamError({ service: "meta-model-api", message: "Response had no choices", retryable: false });
         }
         const calls = choice.message.tool_calls ?? [];
+        const modelMs = Date.now() - stepStarted;
+        const trace: StepTrace = {
+          iteration,
+          model: response.model || this.cfg.meta.modelId,
+          reasoningEffort: this.cfg.meta.reasoningEffort ?? null,
+          startedAt: new Date(stepStarted).toISOString(),
+          modelMs,
+          promptTokens: response.usage?.prompt_tokens ?? null,
+          completionTokens: response.usage?.completion_tokens ?? null,
+          reasoningTokens: response.usage?.completion_tokens_details?.reasoning_tokens ?? null,
+          outcome: calls.length ? "tool_calls" : "answer",
+          tools: [],
+        };
         session.messages.push(
           calls.length > 0
             ? { role: "assistant", content: choice.message.content ?? null, tool_calls: calls }
@@ -406,6 +423,7 @@ export class AgentRunner {
 
         if (calls.length === 0) {
           events?.onStepEnd?.(iteration);
+          events?.onTrace?.(trace);
           return await finish("completed", choice.message.content ?? "", iteration);
         }
 
@@ -413,7 +431,14 @@ export class AgentRunner {
         const approvals: Approval[] = [];
         for (const call of calls) {
           events?.onToolCall?.({ id: call.id, name: call.function.name, input: parseJsonOr(call.function.arguments || "{}") });
+          const toolStarted = Date.now();
           const outcome = await this.handleToolCall(call, ctx);
+          trace.tools.push({
+            id: call.id,
+            name: call.function.name,
+            ms: Date.now() - toolStarted,
+            status: outcome.kind === "approval" ? "pending_approval" : outcome.ok ? "ok" : "error",
+          });
           if (outcome.kind === "approval") {
             approvals.push(outcome.approval);
             toolCalls.push({ id: call.id, name: call.function.name, outcome: "pending_approval" });
@@ -427,6 +452,8 @@ export class AgentRunner {
           await this.save(session);
         }
         events?.onStepEnd?.(iteration);
+        if (approvals.length > 0) trace.outcome = "awaiting_approval";
+        events?.onTrace?.(trace);
 
         if (approvals.length > 0) {
           session.pendingTurn = { toolCalls: calls, results, approvalIds: approvals.map((a) => a.id) };
