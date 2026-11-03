@@ -377,7 +377,7 @@ export function LiveSamOverlay({
         {hud.chips.length > 0 && (
           <ul className="sam-chips" aria-label="What SAM 3.1 outlines show">
             {hud.chips.map((c) => (
-              <li key={c.key} data-tone={c.tone}>
+              <li key={c.key} data-tone={c.tone} data-key={c.key}>
                 {c.text}
               </li>
             ))}

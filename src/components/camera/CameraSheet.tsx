@@ -14,7 +14,13 @@ import {
   otherFacing,
   trackHasTorch,
 } from "@/lib/client/camera";
-import { decideLiveTick, frameDiff, initialLiveState, LIVE_DEFAULTS, lumaSignature } from "@/lib/liveScene";
+import {
+  decideLiveTick,
+  frameDiff,
+  initialLiveState,
+  LIVE_DEFAULTS,
+  lumaSignature,
+} from "@/lib/liveScene";
 import { LiveSamOverlay } from "./LiveSamOverlay";
 
 /** What the app did with one live frame. */
@@ -24,15 +30,35 @@ export type LiveFrameResult =
   | { kind: "unchanged" }
   | { kind: "skipped"; message: string };
 
-type LiveEvent = { id: number; at: string; tone: "info" | "change" | "warn"; text: string };
+type LiveEvent = {
+  id: number;
+  at: string;
+  tone: "info" | "change" | "warn";
+  text: string;
+};
 
-const clock = () => new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const clock = () =>
+  new Date().toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 
 type Phase = "starting" | "live" | "captured" | "error";
 
 function Icon({ d, size = 20 }: { d: string; size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d={d} />
     </svg>
   );
@@ -64,7 +90,10 @@ export function CameraSheet({
   /** Open the OS camera / file picker instead (shown when live capture fails). */
   onFallback: () => void;
   /** Live mode: analyse a frame (Muse Spark + SAM) and update the plan if the scene changed. */
-  onLiveFrame?: (file: File, opts: { baseline: boolean; samChanges?: string[] }) => Promise<LiveFrameResult>;
+  onLiveFrame?: (
+    file: File,
+    opts: { baseline: boolean; samChanges?: string[] },
+  ) => Promise<LiveFrameResult>;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -126,8 +155,11 @@ export function CameraSheet({
       setPhase("starting");
       setProblem(null);
       const pre = cameraPrecheck({
-        isSecureContext: typeof window !== "undefined" ? window.isSecureContext : undefined,
-        hasGetUserMedia: typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia,
+        isSecureContext:
+          typeof window !== "undefined" ? window.isSecureContext : undefined,
+        hasGetUserMedia:
+          typeof navigator !== "undefined" &&
+          !!navigator.mediaDevices?.getUserMedia,
       });
       if (pre) {
         setProblem(pre);
@@ -135,7 +167,9 @@ export function CameraSheet({
         return;
       }
       try {
-        const stream = await navigator.mediaDevices.getUserMedia(cameraConstraints(f));
+        const stream = await navigator.mediaDevices.getUserMedia(
+          cameraConstraints(f),
+        );
         if (gen !== genRef.current) {
           // Closed or restarted while the permission prompt was up: never leave a camera on.
           stream.getTracks().forEach((t) => t.stop());
@@ -151,11 +185,20 @@ export function CameraSheet({
           await v.play().catch(() => undefined);
         }
         const track = stream.getVideoTracks()[0];
-        const caps = typeof track?.getCapabilities === "function" ? track.getCapabilities() : undefined;
+        const caps =
+          typeof track?.getCapabilities === "function"
+            ? track.getCapabilities()
+            : undefined;
         setTorchOk(trackHasTorch(caps));
-        const devices = await navigator.mediaDevices.enumerateDevices().catch(() => []);
+        const devices = await navigator.mediaDevices
+          .enumerateDevices()
+          .catch(() => []);
         const cams = devices.filter((d) => d.kind === "videoinput").length;
-        setCanFlip(cams > 1 || (cams === 0 && isIOS(navigator.userAgent, navigator.maxTouchPoints)));
+        setCanFlip(
+          cams > 1 ||
+            (cams === 0 &&
+              isIOS(navigator.userAgent, navigator.maxTouchPoints)),
+        );
         setPhase("live");
         requestAnimationFrame(() => shutterRef.current?.focus());
       } catch (err) {
@@ -200,9 +243,12 @@ export function CameraSheet({
     };
   }, [release]);
 
-  useEffect(() => () => {
-    if (shot) URL.revokeObjectURL(shot.url);
-  }, [shot]);
+  useEffect(
+    () => () => {
+      if (shot) URL.revokeObjectURL(shot.url);
+    },
+    [shot],
+  );
 
   const close = () => {
     stop();
@@ -233,27 +279,62 @@ export function CameraSheet({
         const ctx = c.getContext("2d");
         if (!ctx) return resolve(null);
         ctx.drawImage(v, 0, 0, width, height);
-        c.toBlob((b) => resolve(b ? new File([b], captureFileName(new Date()), { type: "image/jpeg" }) : null), "image/jpeg", 0.85);
+        c.toBlob(
+          (b) =>
+            resolve(
+              b
+                ? new File([b], captureFileName(new Date()), {
+                    type: "image/jpeg",
+                  })
+                : null,
+            ),
+          "image/jpeg",
+          0.85,
+        );
       });
     const tick = async () => {
       const v = videoRef.current;
       const handler = onLiveRef.current;
-      if (cancelled || !v || !v.videoWidth || !streamRef.current || !tctx || !handler) return;
+      if (
+        cancelled ||
+        !v ||
+        !v.videoWidth ||
+        !streamRef.current ||
+        !tctx ||
+        !handler
+      )
+        return;
       tctx.drawImage(v, 0, 0, thumb.width, thumb.height);
-      const sig = lumaSignature(tctx.getImageData(0, 0, thumb.width, thumb.height).data, thumb.width * thumb.height);
+      const sig = lumaSignature(
+        tctx.getImageData(0, 0, thumb.width, thumb.height).data,
+        thumb.width * thumb.height,
+      );
       const diff = lastSig.current ? frameDiff(lastSig.current, sig) : null;
       const force = samPending.current.length > 0;
       const d = decideLiveTick(liveState.current, Date.now(), diff, { force });
       if (!d.analyze) {
         if (d.reason === "budget_spent") {
           setLive(false);
-          pushEvent("warn", `Live mode paused: ${LIVE_DEFAULTS.maxAnalyses} scene reads used. Turn it on again to continue.`);
-        } else if (d.reason === "unchanged") setLiveNote("Watching: no change in view");
-        else if (d.reason === "cooldown") setLiveNote("Change seen: waiting a few seconds before the next read");
+          pushEvent(
+            "warn",
+            `Live mode paused: ${LIVE_DEFAULTS.maxAnalyses} scene reads used. Turn it on again to continue.`,
+          );
+        } else if (d.reason === "unchanged")
+          setLiveNote("Watching: no change in view");
+        else if (d.reason === "cooldown")
+          setLiveNote(
+            "Change seen: waiting a few seconds before the next read",
+          );
         return;
       }
       liveState.current = { ...liveState.current, inFlight: true };
-      setLiveNote(d.reason === "baseline" ? "Reading the scene…" : force ? "SAM 3.1 saw a change: re-reading…" : "Scene changed: re-reading…");
+      setLiveNote(
+        d.reason === "baseline"
+          ? "Reading the scene…"
+          : force
+            ? "SAM 3.1 saw a change: re-reading…"
+            : "Scene changed: re-reading…",
+      );
       const samChanges = samPending.current;
       try {
         const file = await grab(v);
@@ -261,7 +342,10 @@ export function CameraSheet({
           liveState.current = { ...liveState.current, inFlight: false };
           return;
         }
-        const r = await handler(file, { baseline: d.reason === "baseline", samChanges: d.reason === "baseline" ? [] : samChanges });
+        const r = await handler(file, {
+          baseline: d.reason === "baseline",
+          samChanges: d.reason === "baseline" ? [] : samChanges,
+        });
         if (cancelled) return;
         if (r.kind === "skipped") {
           // Nothing was sent: keep the old baseline so the change is picked up later.
@@ -269,12 +353,23 @@ export function CameraSheet({
           setLiveNote(r.message);
           return;
         }
-        samPending.current = samPending.current.filter((c) => !samChanges.includes(c));
-        liveState.current = { analyses: liveState.current.analyses + 1, lastAnalysisAt: Date.now(), inFlight: false };
+        samPending.current = samPending.current.filter(
+          (c) => !samChanges.includes(c),
+        );
+        liveState.current = {
+          analyses: liveState.current.analyses + 1,
+          lastAnalysisAt: Date.now(),
+          inFlight: false,
+        };
         lastSig.current = sig;
         setReads(liveState.current.analyses);
-        if (r.kind === "baseline") pushEvent("info", "Scene read → plan started");
-        else if (r.kind === "changed") pushEvent("change", `Scene changed → plan updated: ${r.changes.join("; ")}`);
+        if (r.kind === "baseline")
+          pushEvent("info", "Scene read → plan started");
+        else if (r.kind === "changed")
+          pushEvent(
+            "change",
+            `Scene changed → plan updated: ${r.changes.join("; ")}`,
+          );
         else pushEvent("info", "Movement seen, nothing that changes the plan");
         setLiveNote("Watching");
       } catch (err) {
@@ -327,7 +422,11 @@ export function CameraSheet({
       if (liveRef.current) {
         samPending.current = [...new Set([...samPending.current, ...changes])];
         pushEvent("change", `SAM 3.1: ${plain.join("; ")} → updating the plan`);
-      } else pushEvent("info", `SAM 3.1: ${plain.join("; ")} (turn on Live to update the plan)`);
+      } else
+        pushEvent(
+          "info",
+          `SAM 3.1: ${plain.join("; ")} (turn on Live to update the plan)`,
+        );
     },
     [pushEvent],
   );
@@ -343,7 +442,9 @@ export function CameraSheet({
     if (!track) return;
     const next = !torchOn;
     try {
-      await track.applyConstraints({ advanced: [{ torch: next } as MediaTrackConstraintSet] });
+      await track.applyConstraints({
+        advanced: [{ torch: next } as MediaTrackConstraintSet],
+      });
       setTorchOn(next);
     } catch {
       setTorchOk(false);
@@ -383,7 +484,9 @@ export function CameraSheet({
 
   const usePhoto = () => {
     if (!shot) return;
-    const file = new File([shot.blob], captureFileName(new Date()), { type: "image/jpeg" });
+    const file = new File([shot.blob], captureFileName(new Date()), {
+      type: "image/jpeg",
+    });
     close();
     onCapture(file);
   };
@@ -414,36 +517,45 @@ export function CameraSheet({
               Snap your room
             </h2>
             <p id="camera-desc" className="camera-desc">
-              Frame windows, vents, the purifier and any haze. Muse Spark reads the scene, SAM 3.1 outlines it, and device actions still wait for your approval.
+              Frame windows, vents, the purifier and any haze. Muse Spark reads
+              the scene, SAM 3.1 outlines it, and device actions still wait for
+              your approval.
             </p>
           </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={outlines}
-            className="live-toggle outline-toggle"
-            data-on={outlines}
-            onClick={toggleOutlines}
-            disabled={phase !== "live"}
-            title="Draw SAM 3.1 outlines on the live picture (keyframes every ~1.5 s, tracked on-device in between)"
-          >
-            <span className="live-knob" aria-hidden="true" /> Outlines
-          </button>
-          {onLiveFrame && (
+          <div className="camera-switches">
             <button
               type="button"
               role="switch"
-              aria-checked={live}
-              className="live-toggle"
-              data-on={live}
-              onClick={toggleLive}
+              aria-checked={outlines}
+              className="live-toggle outline-toggle"
+              data-on={outlines}
+              onClick={toggleOutlines}
               disabled={phase !== "live"}
-              title="Re-read the scene every few seconds, only when it changes"
+              title="Draw SAM 3.1 outlines on the live picture (keyframes every ~1.5 s, tracked on-device in between)"
             >
-              <span className="live-knob" aria-hidden="true" /> Live
+              <span className="live-knob" aria-hidden="true" /> Outlines
             </button>
-          )}
-          <button type="button" className="btn btn-secondary icon-btn camera-close" onClick={close} aria-label="Close camera">
+            {onLiveFrame && (
+              <button
+                type="button"
+                role="switch"
+                aria-checked={live}
+                className="live-toggle"
+                data-on={live}
+                onClick={toggleLive}
+                disabled={phase !== "live"}
+                title="Re-read the scene every few seconds, only when it changes"
+              >
+                <span className="live-knob" aria-hidden="true" /> Live
+              </button>
+            )}
+          </div>
+          <button
+            type="button"
+            className="btn btn-secondary icon-btn camera-close"
+            onClick={close}
+            aria-label="Close camera"
+          >
             <Icon d={ICONS.close} />
           </button>
         </header>
@@ -455,12 +567,20 @@ export function CameraSheet({
             playsInline
             muted
             autoPlay
-            aria-label={phase === "live" ? `Live preview from the ${facing === "environment" ? "rear" : "front"} camera` : undefined}
+            aria-label={
+              phase === "live"
+                ? `Live preview from the ${facing === "environment" ? "rear" : "front"} camera`
+                : undefined
+            }
             hidden={phase === "captured" || phase === "error"}
           />
           {shot && phase === "captured" && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img className="camera-shot" src={shot.url} alt="Captured photo of your room, ready to analyse" />
+            <img
+              className="camera-shot"
+              src={shot.url}
+              alt="Captured photo of your room, ready to analyse"
+            />
           )}
           {phase === "starting" && (
             <p className="camera-status" role="status">
@@ -472,11 +592,17 @@ export function CameraSheet({
               <h3>{msg.title}</h3>
               <p>{msg.body}</p>
               <div className="camera-error-actions">
-                {problem !== "insecure" && problem !== "unsupported" && problem !== "no-camera" && (
-                  <button type="button" className="btn btn-secondary" onClick={() => void start(facing)}>
-                    Try again
-                  </button>
-                )}
+                {problem !== "insecure" &&
+                  problem !== "unsupported" &&
+                  problem !== "no-camera" && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => void start(facing)}
+                    >
+                      Try again
+                    </button>
+                  )}
                 <button
                   type="button"
                   className="btn btn-primary"
@@ -490,16 +616,31 @@ export function CameraSheet({
               </div>
             </div>
           )}
-          {phase === "live" && !outlines && <div className="camera-frame" aria-hidden="true" />}
-          {phase === "live" && outlines && <LiveSamOverlay key={outlineRun} videoRef={videoRef} mirrored={facing === "user"} onChanges={onSamChanges} />}
+          {phase === "live" && !outlines && (
+            <div className="camera-frame" aria-hidden="true" />
+          )}
+          {phase === "live" && outlines && (
+            <LiveSamOverlay
+              key={outlineRun}
+              videoRef={videoRef}
+              mirrored={facing === "user"}
+              onChanges={onSamChanges}
+            />
+          )}
           {(live || events.length > 0) && (
             <div className="live-panel" data-testid="live-panel">
               {live && (
                 <p className="live-status" role="status">
-                  <span className="live-dot" aria-hidden="true" /> {liveNote || "Watching"} · {reads}/{LIVE_DEFAULTS.maxAnalyses} reads
+                  <span className="live-dot" aria-hidden="true" />{" "}
+                  {liveNote || "Watching"} · {reads}/{LIVE_DEFAULTS.maxAnalyses}{" "}
+                  reads
                 </p>
               )}
-              <ol className="live-events" aria-live="polite" aria-label="Live scene events">
+              <ol
+                className="live-events"
+                aria-live="polite"
+                aria-label="Live scene events"
+              >
                 {events.map((e) => (
                   <li key={e.id} data-tone={e.tone}>
                     <time>{e.at}</time> {e.text}
@@ -514,10 +655,19 @@ export function CameraSheet({
         <div className="camera-controls">
           {phase === "captured" ? (
             <>
-              <button type="button" className="btn btn-secondary btn-lg" onClick={retake}>
+              <button
+                type="button"
+                className="btn btn-secondary btn-lg"
+                onClick={retake}
+              >
                 <Icon d={ICONS.retake} /> Retake
               </button>
-              <button ref={useRef_} type="button" className="btn btn-primary btn-lg" onClick={usePhoto}>
+              <button
+                ref={useRef_}
+                type="button"
+                className="btn btn-primary btn-lg"
+                onClick={usePhoto}
+              >
                 <Icon d={ICONS.use} /> Use photo
               </button>
             </>
@@ -529,7 +679,13 @@ export function CameraSheet({
                 onClick={toggleTorch}
                 disabled={!torchOk || phase !== "live"}
                 aria-pressed={torchOn}
-                aria-label={torchOk ? (torchOn ? "Turn torch off" : "Turn torch on") : "Torch not available on this camera"}
+                aria-label={
+                  torchOk
+                    ? torchOn
+                      ? "Turn torch off"
+                      : "Turn torch on"
+                    : "Torch not available on this camera"
+                }
                 title={torchOk ? "Torch" : "Torch not available on this camera"}
               >
                 <Icon d={ICONS.torch} />

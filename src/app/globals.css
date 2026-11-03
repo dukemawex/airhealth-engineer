@@ -3547,3 +3547,15 @@ dialog.camera-sheet::backdrop {
   .sam-hud-line, .sam-chips li { font-size: 11px; }
   .sam-hud-meta { display: none; }
 }
+.camera-head > div:first-child { min-width: 0; flex: 1 1 auto; }
+.camera-switches { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.camera-switches .live-toggle { margin-right: 0; }
+@media (max-width: 520px) {
+  .camera-head { flex-wrap: wrap; gap: var(--space-2, 8px); }
+  .camera-head > div:first-child { order: 3; flex-basis: 100%; }
+  .camera-switches { justify-content: flex-start; flex: 1 1 auto; }
+}
+@media (max-width: 520px) {
+  /* Keep the picture visible on phones: air-relevant chips only (smoke, window, stove); the rest stay in the outlines. */
+  .sam-chips li[data-tone="info"]:not([data-key="window"]) { display: none; }
+}
