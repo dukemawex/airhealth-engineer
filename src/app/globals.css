@@ -3166,3 +3166,252 @@ body {
     transform: none;
   }
 }
+
+
+/* ==========================================================================
+   Live camera sheet
+   ========================================================================== */
+.camera-btn .chip-model {
+  margin-left: 2px;
+}
+dialog.camera-sheet {
+  border: 1px solid var(--color-border-strong);
+  padding: 0;
+  width: min(720px, calc(100vw - 2 * var(--space-4)));
+  max-height: calc(100dvh - 2 * var(--space-4));
+  border-radius: 28px;
+  background: radial-gradient(120% 60% at 50% 0%, rgb(45 212 191 / 0.14), transparent 60%), var(--color-surface);
+  color: var(--color-text);
+  box-shadow: 0 30px 90px rgb(0 0 0 / 0.6), 0 0 0 1px rgb(45 212 191 / 0.08);
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(16px) scale(0.98);
+  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease), overlay var(--dur) allow-discrete,
+    display var(--dur) allow-discrete;
+}
+dialog.camera-sheet[open] {
+  opacity: 1;
+  transform: none;
+}
+@starting-style {
+  dialog.camera-sheet[open] {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+}
+dialog.camera-sheet::backdrop {
+  background: rgb(2 6 8 / 0.78);
+  backdrop-filter: blur(6px);
+}
+.camera-inner {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  max-height: calc(100dvh - 2 * var(--space-4));
+  overflow-y: auto;
+}
+.camera-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: var(--space-4);
+}
+.camera-eyebrow .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f43f5e;
+  box-shadow: 0 0 0 4px rgb(244 63 94 / 0.18);
+}
+.camera-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  margin: var(--space-2) 0 var(--space-1);
+}
+.camera-desc,
+.camera-note {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  max-width: 60ch;
+}
+.camera-note {
+  font-size: var(--text-xs);
+  text-align: center;
+  margin: 0 auto;
+}
+.camera-stage {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: 22px;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 40%, #0f1d22, #050709);
+  border: 1px solid var(--color-border);
+  display: grid;
+  place-items: center;
+}
+.camera-video,
+.camera-shot {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.camera-stage[data-facing="user"] .camera-video {
+  transform: scaleX(-1);
+}
+.camera-frame {
+  position: absolute;
+  inset: 8%;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--color-primary), var(--color-primary)) top left / 28px 3px no-repeat,
+    linear-gradient(var(--color-primary), var(--color-primary)) top left / 3px 28px no-repeat,
+    linear-gradient(var(--color-primary), var(--color-primary)) top right / 28px 3px no-repeat,
+    linear-gradient(var(--color-primary), var(--color-primary)) top right / 3px 28px no-repeat,
+    linear-gradient(var(--color-primary), var(--color-primary)) bottom left / 28px 3px no-repeat,
+    linear-gradient(var(--color-primary), var(--color-primary)) bottom left / 3px 28px no-repeat,
+    linear-gradient(var(--color-primary), var(--color-primary)) bottom right / 28px 3px no-repeat,
+    linear-gradient(var(--color-primary), var(--color-primary)) bottom right / 3px 28px no-repeat;
+  filter: drop-shadow(0 0 6px rgb(45 212 191 / 0.6));
+}
+.camera-flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  animation: camera-flash 220ms ease-out forwards;
+  pointer-events: none;
+}
+@keyframes camera-flash {
+  from {
+    opacity: 0.85;
+  }
+  to {
+    opacity: 0;
+  }
+}
+.camera-status {
+  position: absolute;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  padding: var(--space-4);
+  text-align: center;
+}
+.camera-error {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  max-width: 46ch;
+  text-align: center;
+  justify-items: center;
+}
+.camera-error h3 {
+  font-family: var(--font-display);
+  font-size: var(--text-lg, 1.25rem);
+  margin: 0;
+}
+.camera-error p {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+.camera-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  justify-content: center;
+}
+.camera-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  min-height: 84px;
+}
+.camera-controls .btn-lg {
+  min-width: 140px;
+}
+.camera-side {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+}
+.camera-side[aria-pressed="true"] {
+  background: #fde68a;
+  color: #3b2a00;
+  border-color: #fde68a;
+}
+.shutter {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  border: 3px solid var(--color-text);
+  background: transparent;
+  padding: 5px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: transform var(--dur) var(--ease);
+}
+.shutter span {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--gradient-brand);
+  box-shadow: 0 0 24px rgb(45 212 191 / 0.55);
+}
+.shutter:hover:not(:disabled) {
+  transform: scale(1.05);
+}
+.shutter:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.shutter:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.shutter:focus-visible {
+  outline: 3px solid var(--color-primary-strong);
+  outline-offset: 4px;
+}
+:root[data-theme="light"] dialog.camera-sheet {
+  box-shadow: 0 30px 80px rgb(12 42 49 / 0.25);
+}
+@media (max-width: 560px) {
+  dialog.camera-sheet {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    border: none;
+  }
+  .camera-inner {
+    height: 100dvh;
+    max-height: 100dvh;
+    padding: var(--space-4);
+    grid-template-rows: auto 1fr auto auto;
+  }
+  .camera-desc {
+    display: none;
+  }
+  .camera-stage {
+    aspect-ratio: auto;
+    min-height: 0;
+  }
+  .camera-controls .btn-lg {
+    min-width: 0;
+    flex: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  dialog.camera-sheet,
+  .shutter {
+    transition: none;
+  }
+  .camera-flash {
+    animation: none;
+    opacity: 0;
+  }
+}

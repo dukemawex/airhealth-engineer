@@ -93,8 +93,8 @@ const STAGE: Array<{ model: string; title: string; art: ReactNode }> = [
   },
 ];
 
-/** Ask the composer to open its photo picker or microphone (keeps one input pipeline). */
-function composerAction(kind: "attach" | "voice") {
+/** Ask the composer to open its live camera, photo picker or microphone (keeps one input pipeline). */
+function composerAction(kind: "attach" | "voice" | "camera") {
   window.dispatchEvent(new CustomEvent(`airhealth:${kind}`));
 }
 
@@ -257,7 +257,7 @@ export function EmptyState({
               </svg>
               {geoState === "locating" ? "Locating…" : "Check my air now"}
             </button>
-            <button type="button" className="btn btn-secondary btn-lg" onClick={() => composerAction("attach")} disabled={disabled}>
+            <button type="button" className="btn btn-secondary btn-lg" onClick={() => composerAction("camera")} disabled={disabled} aria-haspopup="dialog">
               <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z" />
                 <circle cx="12" cy="13.5" r="3.5" />
