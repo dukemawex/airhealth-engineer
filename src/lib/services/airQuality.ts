@@ -289,7 +289,21 @@ export async function fetchAirQuality(
   let openAqError: unknown;
   try {
     const snap = await fromOpenAq(loc, radiusMeters, deps);
-    if (snap) return snap;
+    if (snap && snap.readings.some((r) => !r.stale)) return snap;
+    if (snap) {
+      // Every nearby station is stale (e.g. last reported years ago): prefer current modelled values.
+      const latest = snap.readings.map((r) => r.observedAt).filter(Boolean).sort().pop();
+      const model = deps.modelFallback ? await fromModel(loc, deps).catch(() => null) : null;
+      if (!model) return snap;
+      model.sourceNote =
+        `No OpenAQ station within ${WIDEST_SEARCH_KM} km has reported recently` +
+        (snap.nearestStationKm !== undefined ? ` (the nearest, ${snap.nearestStationKm} km away, last reported ${latest ? latest.slice(0, 10) : "long ago"})` : "") +
+        ", so these are MODELLED values " +
+        "(Copernicus CAMS via Open-Meteo, ~11-40 km grid), not measurements. Treat as indicative.";
+      model.nearestStationKm = snap.nearestStationKm;
+      model.searchRadiusKm = snap.searchRadiusKm;
+      return model;
+    }
   } catch (err) {
     openAqError = err;
     deps.logger.warn("openaq lookup failed", { error: err });

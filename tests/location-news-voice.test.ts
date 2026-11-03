@@ -138,6 +138,27 @@ describe("station search", () => {
     expect(loc.map((c) => c.url.searchParams.get("radius"))).toEqual(["15000", "25000", null]);
     expect(loc.every((c) => !(c.url.searchParams.get("bbox") && c.url.searchParams.get("coordinates")))).toBe(true);
   });
+
+  it("uses modelled values when every nearby station is years out of date", async () => {
+    const f = fakeFetch((url) => {
+      if (url.pathname === "/v3/locations") return { results: [station(9, 8.55, 4.55, 2000)] };
+      if (url.pathname === "/v3/locations/9/latest") return { results: [{ datetime: { utc: "2020-10-13T02:00:00Z" }, value: 0.1, sensorsId: 90, locationsId: 9 }] };
+      if (url.pathname === "/air-quality") return { timezone: "Africa/Lagos", current: { time: "2026-11-03T05:00", pm2_5: 38.2, pm10: 80 }, current_units: { pm2_5: "μg/m³", pm10: "μg/m³" } };
+      return new Response("nope", { status: 404 });
+    });
+    const snap = await fetchAirQuality({ latitude: 8.5, longitude: 4.55, name: "Ilorin", source: "geocoded" } as never, 15000, {
+      fetchImpl: f.impl,
+      logger,
+      timeoutMs: 2000,
+      openaqApiKey: "k",
+      openaqBaseUrl: "https://openaq.test/v3",
+      modelFallback: true,
+      modelBaseUrl: "https://model.test",
+    });
+    expect(snap.source).toBe("open-meteo-cams-model");
+    expect(snap.sourceNote).toMatch(/has not reported recently \(last reading 2020-10-13\)/);
+    expect(snap.readings.find((r) => r.parameter === "pm25")?.value).toBe(38.2);
+  });
 });
 
 const rss = (items: string) => `<?xml version="1.0"?><rss><channel><title>Feed</title>${items}</channel></rss>`;
