@@ -4,22 +4,35 @@
 
 # AirHealth Engineer
 
-An autonomous agent that works where **engineering meets health**. You say where you are and what matters about your health. The agent:
+**An agent that engineers your indoor air, not medical advice.** AirHealth Engineer closes the loop between sensing and a physical system. You speak, snap your room or type where you are, and the agent:
 
-1. checks live air quality there
-2. designs an engineered indoor-air intervention (filtration sizing from CADR and air changes, a ventilation schedule, exposure guidance)
-3. asks you to approve each device action before anything moves
-4. keeps watching the air and tells you only when something is worth it
+1. senses: live outdoor air (OpenAQ, CAMS), the 72-hour CAMS forecast, and your photo of the room (Muse Spark scene analysis plus SAM 3.1 outlines of haze, windows, vents and purifiers)
+2. plans: an engineered intervention (CADR sizing from room volume and air changes, a ventilation schedule, filter class) and an hour-by-hour 72-hour device plan
+3. asks you to approve every device action before anything moves (purifier, windows, HVAC)
+4. controls the devices through Home Assistant, a signed webhook, Web Bluetooth or the sandbox, then keeps monitoring and only interrupts you when the air changes enough to matter
 
-**Meta Muse Spark** (through the Meta Model API) is the only LLM. It plans, calls the tools, explains its reasoning, and decides whether a monitoring change deserves a notification.
+**Push the Frontier:** a Meta-model agent that drives a real physical system behind human approval gates. **Build for Your World:** it works anywhere on Earth (no seeded city or data), and was built in Ilorin, Nigeria with Lagos haze and harmattan dust in mind.
 
-> Not medical advice. The agent explains environmental exposure and engineering controls. It doesn't diagnose or prescribe.
+Every model call goes to **Meta models only** (the Meta Model API, `https://api.meta.ai/v1`): Muse Spark, SAM 3.1, Muse Voice Transcribe and Muse Image. Each endpoint has a capability check and an honest fallback.
 
-![Desktop empty state](docs/screenshots/empty-desktop.png)
+> Not medical advice. The agent controls environment and devices: exposure, filtration and ventilation. Your optional **sensitivity profile** only tunes device thresholds. It doesn't diagnose or prescribe. Seek urgent care for severe symptoms.
 
-<details><summary>Mobile empty state</summary>
+![Studio home, dark](docs/screenshots/empty-desktop.png)
 
-<img src="docs/screenshots/empty-mobile.png" width="320" alt="Mobile empty state" />
+<details><summary>Mobile and light mode</summary>
+
+<img src="docs/screenshots/empty-mobile.png" width="320" alt="Mobile studio home" />
+
+![Studio home, light mode](docs/screenshots/empty-desktop-light.png)
+</details>
+
+<details><summary>A live session (Ikeja, real OpenAQ reading, nothing seeded)</summary>
+
+![Plan awaiting approval](docs/screenshots/conversation-desktop.png)
+
+![Human approval gate](docs/screenshots/approval-desktop.png)
+
+<img src="docs/screenshots/conversation-mobile.png" width="320" alt="Live session on mobile" />
 </details>
 
 ---
@@ -27,7 +40,9 @@ An autonomous agent that works where **engineering meets health**. You say where
 ## Contents
 
 - [How it works](#how-it-works)
-- [Location, voice, news and Bluetooth](#location-voice-news-and-bluetooth) (plus health chips and quick starts)
+- [Meta models used](#meta-models-used)
+- [Built during the hackathon](#built-during-the-hackathon)
+- [Location, voice, news and Bluetooth](#location-voice-news-and-bluetooth) (plus sensitivity chips and quick starts)
 - [Quick start (local)](#quick-start-local)
 - [Keys and configuration](#keys-and-configuration)
 - [Deploy to Vercel](#deploy-to-vercel)
@@ -48,9 +63,11 @@ The UI explains this too (header → **How it works**).
 
 | Step | What happens | Tool / route |
 | --- | --- | --- |
-| 1. You describe | A location (any city, area, postcode, or browser geolocation) plus any health context: conditions, symptoms, age group, plans. | `POST /api/agent` |
+| 1. You describe | Speak (Muse Voice Transcribe, Web Speech fallback), snap a photo or short video of the room, or type a location (any city, area, postcode, or browser geolocation). An optional sensitivity profile (household, age group, sensitivities) only tunes device thresholds. | `POST /api/transcribe`, `POST /api/vision`, `POST /api/agent` |
+| 1b. Photo → scene | Muse Spark returns a structured scene (haze level, openings, vents, purifier, room size estimate) and SAM 3.1 outlines each region. The scene feeds the device plan: e.g. close the open window it found, size the purifier to the room it estimated. | `POST /api/vision` |
 | 2. Muse Spark plans | The model reads the conversation and decides which tools to call. It asks only for the minimum it still needs. | Meta Model API `/chat/completions` (streamed) |
 | 3. Real data | Places are geocoded worldwide (Open-Meteo, with OpenStreetMap Nominatim for postcodes and addresses; no keys needed). Shared coordinates are reverse-geocoded to a readable place. The nearest **OpenAQ v3** stations are ranked by distance, widening from 25 km up to 100 km when nothing closer reports. If no station reports, or every nearby station is stale (some report only years-old readings), CAMS modelled data is used and labelled **Modelled**. | `getAirQuality`, `getHealthContext` |
+| 3b. 72-hour plan | The CAMS hourly forecast for your coordinates goes to Muse Spark with a strict `json_schema`; it returns a timeline of device steps (purifier speed, windows, HVAC) for the worst hours. Each step has its own Approve button. Rules-based plan if the planner is unavailable. | `planForecast` |
 | 4. Engineered plan | Room volume → required clean-air delivery rate (CADR, m³/h and CFM) for the target air changes per hour, filter class, ventilation schedule, exposure guidance, and the device commands that would carry it out. | `designIntervention` |
 | 5. Approval gate | Every device command pauses the run. The pending action is persisted, and nothing runs until you **Approve** or **Reject**. Approvals expire (`APPROVAL_TTL_MINUTES`). | `executeDeviceAction`, `/api/approvals/:id/*` |
 | 6. Execute or simulate | Approved commands run through the configured adapter. **Sandbox** (the default) simulates and records state. Home Assistant and a signed webhook are the real adapters. | device adapters |
@@ -69,12 +86,49 @@ Each conversation has its own memory, stored server-side: messages, location, he
 
 ---
 
+## Meta models used
+
+Only Meta models are called, all through `MODEL_API_KEY` against `https://api.meta.ai/v1`. `GET /api/capabilities` (public) probes each one, and Judge mode shows what is live and what is falling back.
+
+| Model | Used for | Endpoint | Fallback when unavailable |
+| --- | --- | --- | --- |
+| **Muse Spark** (`muse-spark-1.3`, `META_MODEL_ID`) | The agent: tool calling, reasoning, monitoring decisions | `/chat/completions` (streamed) | Retry with backoff, then a retryable notice |
+| **Muse Spark** vision, structured output | Scene analysis of your room photo or video frames | `/chat/completions` with `json_schema` | Text-only description, no device hints |
+| **Muse Spark** planner, `json_schema` | 72-hour CAMS forecast device plan (`FORECAST_PLANNER_EFFORT`, default `high`) | `/chat/completions` | Deterministic rules plan |
+| **SAM 3.1** (`sam-3.1`) | Masks for haze, windows, vents and purifiers on your photo | segmentation | Muse Spark grounding boxes |
+| **Muse Voice Transcribe** (`muse-voice-transcribe-1.0`) | Push-to-talk speech to text | transcription | Browser Web Speech API |
+| **Muse Image** (`muse-image-1.0`) | Background art for the "air today" card | image generation | Brand gradient card |
+
+The open-weights Muse Glimmer and Muse Spark Open are allowed by the challenge but not used. No other model provider is called.
+
+---
+
+## Built during the hackathon
+
+Everything in this repo was built during the hackathon. The first commit was on 2026-11-03 at 04:12 (+01:00, Africa/Lagos).
+
+| Feature | Commit | Date (+01:00) |
+| --- | --- | --- |
+| Muse Spark agent with approval-gated device control, live air quality, monitoring | `05b2e5e` | 2026-11-03 04:12 |
+| Location resolution, voice, news & talks, Web Bluetooth devices | `57f805a` | 2026-11-03 05:10 |
+| Sensitivity suggestion chips and quick starts | `2b731cf` | 2026-11-03 05:41 |
+| Muse Spark vision with structured output plus SAM 3.1 overlay | `abf551a` | 2026-11-03 06:23 |
+| Muse Voice Transcribe with Web Speech fallback | `40d1b24` | 2026-11-03 06:25 |
+| Reasoning timeline and Judge mode | `ed23823` | 2026-11-03 06:28 |
+| 72-hour CAMS forecast plan with per-step approval (`json_schema`) | `1922a82` | 2026-11-03 06:36 |
+| Muse Image "air today" card (share sheet or download only) | `538246a` | 2026-11-03 06:38 |
+| Studio redesign: dark Canva × Higgsfield-style UI, prompt bar, gallery, sensitivity profile copy | `53ed25f` | 2026-11-03 06:48 |
+
+The 3-minute demo script is in [docs/demo-script.md](docs/demo-script.md).
+
+---
+
 ## Location, voice, news and Bluetooth
 
-**Health suggestions and quick starts**
-- Under the health field, tap-to-toggle chips cover common contexts (asthma, allergies / hay fever, COPD, heart condition, pregnant, child at home, older adult 65+, diabetes, outdoor worker, runner) and how you feel today (coughing, wheezing, shortness of breath, headache, itchy eyes). Each chip is a button with `aria-pressed`; tapping adds or removes a plain phrase in the field, and typing the phrase yourself lights the chip up too.
+**Sensitivity suggestions and quick starts**
+- Under the sensitivity profile field, tap-to-toggle chips cover common contexts (asthma, allergies / hay fever, COPD, heart condition, pregnant, child at home, older adult 65+, diabetes, outdoor worker, runner) and how you feel today (coughing, wheezing, shortness of breath, headache, itchy eyes). Each chip is a button with `aria-pressed`; tapping adds or removes a plain phrase in the field, and typing the phrase yourself lights the chip up too.
 - Selected chips are also sent as a structured profile (`conditions`, `symptoms`, `ageGroup`, `household`, `activities`) to `getHealthContext`, which tightens thresholds for sensitive household members and adds timing cautions for regular outdoor exposure. Chips describe context only; nothing is a diagnosis.
-- Once a briefing is running, the **Health context** button under the composer opens a compact chip row that keeps a single "My health context: …" line in your message.
+- Once a briefing is running, the **Sensitivity** chip in the prompt bar opens a compact chip row that keeps a single "My sensitivity profile: …" line in your message.
 - **Quick start** prompts (check the air now with your location, plan a safer commute, set up the purifier for tonight, exercising outside) start a briefing in one tap. None names a fixed city.
 
 **Location**
@@ -84,8 +138,8 @@ Each conversation has its own memory, stored server-side: messages, location, he
 - Stations are ranked by our own haversine distance, with recent reporters first. The search widens 15 → 25 → 100 km. The card shows the nearest station and its distance, and the note warns when it is more than 25 km away. If every station in range is stale, the card switches to labelled modelled values and the note names the last station reading date.
 - The agent prompt carries the resolved place and coordinates. If you shared a precise fix, `getAirQuality` keeps it even when the model passes the town name back.
 
-**Voice** (browser only, nothing is recorded server-side)
-- The mic button uses the Web Speech API (Chrome, Edge, Safari) in your browser language and shows interim words as you speak. It is hidden where unsupported; typing always works.
+**Voice**
+- The **Voice** chip records push-to-talk audio and sends it to **Muse Voice Transcribe** (`POST /api/transcribe`); the audio is not stored. If the model is unavailable it falls back to the browser Web Speech API (Chrome, Edge, Safari), and the chip shows which one is active (Muse / Web). Typing always works.
 - **Read replies aloud** speaks Muse Spark's answers with `speechSynthesis`. It is off by default, stored per device, and stops when you send the next message.
 
 **News & talks** (`GET /api/news?place=`)
@@ -287,55 +341,35 @@ src/
 
 ## Design system
 
-The interface reads like a **live news briefing** set inside a **design-editor workspace**. The editorial side gives you serif headlines, a masthead, hairline rules, kickers and "live" badges. The editor side gives you a rounded left rail, a white canvas, tile grids and a floating composer. Both are built from scratch; no third-party logos, names or assets are used.
+A dark **studio** that mixes two design languages, built from scratch with no third-party logos, names or assets: the friendly, roomy side of a design editor (rounded cards, a labelled left rail, template tiles, generous whitespace, hover lifts) and the cinematic side of an AI media studio (dark stage, gradient glows, bold uppercase display type, a fanned preview stage, a media gallery and a bottom prompt bar with model chips). Dark is the default; a light mode is one click away.
 
 - **Layout:**
-  - **Masthead.** A dateline strip shows today's date, a one-line note and the live badges ("Agent online", "Live · Monitoring"). Below it sit the wordmark (the SVG logo plus a serif "AirHealth *Engineer*") and pill actions.
-  - **Left rail.** Briefing, Status, Plans (interventions) and Guide (how it works). The pending-approval count shows on Plans.
-  - **Canvas.** A white, soft-shadowed card holding the conversation.
-    - Empty state: an editorial front page with a display headline, a standfirst, a double rule, a "Start your briefing" form and "In this briefing" tiles.
-    - Once a briefing starts, the masthead headline follows the agent's current verdict.
-  - **News sidebar ("The status desk").** Four ruled sections:
-    - Air now
-    - Your health context
-    - Interventions
-    - Engineering status
-- **Tokens:** CSS variables in [`src/app/globals.css`](src/app/globals.css) cover colour, space, radius, type scale, shadow and motion.
-  - Palette: deep teal (`--color-primary #0b6477`, ink `#0c2a31`) on soft blue-green surfaces.
-  - Restrained gradients:
-    - `--gradient-brand` (`#0a5868 → #0f7f86 → #13788f`) for primary pills, the active rail item and the masthead rule. White text stays ≥ 4.7:1 at every stop.
-    - `--gradient-soft` for your own messages.
-  - Approval accent: blue-teal `#0b5f7f`.
-  - Status: `ok` teal, `watch` amber, `act` orange. **Red only for true warnings** (hazardous air, errors).
-  - Radii: 12, 18 and 24 px plus pills. Three shadow levels, including a `float` shadow for the composer toolbar.
-- **Type:** both via `next/font/google`.
-  - **Newsreader** (serif, optical sizes and italics) for the wordmark, headlines, section heads, card titles, readings and the agent's prose.
-  - **Inter** for UI, labels and data.
-- **Editorial primitives:** `.kicker` (uppercase label with a hairline separator), `.dateline`, `.rule` and `.rule-double`, `.standfirst`, and `.live` badges with a pulsing dot.
-- **Components:**
-  - Masthead and LeftRail
-  - ToolResultCard
-  - AirQualityCard, with a sparkline of real readings that appears after the second reading
-  - InterventionPlanCard
-  - HealthContextSummary
-  - ApprovalRequestCard and ApprovalModal (native `<dialog>`, focus-trapped, Esc to close)
-  - StatusSidebar
-  - Empty, loading, error and success states
-  - SVG logo, from a single source (see [Logo](#logo))
-- **No demo data:** the sidebar shows plain placeholder text until a real reading, health context or plan exists. The tiles explain the method; they never show sample numbers.
+  - **Masthead.** Blurred dark bar: logo, "AirHealth Engineer" wordmark, a Studio tag, live badges (agent online, monitoring), and actions: theme toggle, Judge mode, How it works, New briefing.
+  - **Left rail.** Labelled icons: Briefing, Status, Plans, News, Devices, Guide. The pending-approval count shows on Plans.
+  - **Stage.** The empty state is a hero: eyebrow with today's date, "Engineer your indoor air" display headline with a teal-to-sky gradient, CTAs (Check my air now, Snap your room, Speak) and a fanned stage of four illustrative cards (Muse Voice, SAM 3.1, Muse Spark, Muse Image). The cards are artwork only, never data.
+  - **Templates.** "Start from a template" tiles built from the quick-start prompts, each with a gradient thumbnail and a hover arrow.
+  - **Set the scene.** Location and optional sensitivity profile form, next to "How the loop closes" (Sense → Plan → Approve & control).
+  - **Gallery.** Once you share photos or make an air card, a strip of results appears: your photo with its SAM 3.1 masks, and Muse Image cards (download links). It is built only from this session; nothing is seeded.
+  - **Prompt bar.** A floating rounded bar at the bottom with a glow on focus and mode chips: Muse Spark (the agent), Photo · SAM 3.1, Voice · Muse/Web, Air card · Muse Image, and Sensitivity.
+  - **Status desk** (right). Air now, Sensitivity profile, Interventions, Engineering status, News & talks.
+- **Tokens:** CSS variables in [`src/app/globals.css`](src/app/globals.css).
+  - Dark: background `#07090c`, surfaces `#10151b` / `#161d25`, text `#e9f1f2`, teal primary `#2dd4bf`, `--gradient-brand` teal → `#38bdf8`, radial glow canvas.
+  - Light (`:root[data-theme="light"]`): the original deep-teal palette (`#0b6477` on blue-green surfaces).
+  - The theme is set before paint from `localStorage["airhealth.theme"]`, so there is no flash.
+  - Status: `ok` teal, `watch` amber, `act` orange. Red only for true warnings.
+- **Type:** Space Grotesk (display, uppercase headlines) and Inter (UI and prose), both via `next/font/google`.
+- **Motion:** card fan and hover lifts, glow on focus; all disabled under `prefers-reduced-motion`.
 - **Accessibility:**
-  - Landmarks: `header`, `nav` (the rail), `main`, `aside`.
-  - A skip link.
-  - The chat log is `role="log"` with `aria-live="polite"`, and the status hero is a live region too.
-  - Rail buttons use `aria-current`, and Status and Plans move focus to the matching sidebar section.
-  - Every icon button has a label.
-  - Visible focus rings, and text and UI colours meet WCAG AA contrast.
-  - `prefers-reduced-motion` disables the pulses, transitions and smooth scrolling.
+  - Landmarks (`header`, `nav`, `main`, `aside`) and a skip link.
+  - The chat log is `role="log"` with `aria-live="polite"`.
+  - Mode chips and the theme toggle use `aria-pressed` / `aria-expanded`; every icon button has a label.
+  - Visible `:focus-visible` rings; text meets WCAG AA in both themes.
 - **Responsive:**
-  - **Above 1180 px:** three columns: rail, canvas, sidebar.
-  - **1180 px and below:** the sidebar becomes a drawer, with a backdrop and Esc to close.
-  - **760 px and below:** the rail becomes a bottom tab bar and the canvas runs edge to edge.
-  - **440 px and below:** button labels and badge text shorten.
+  - **Above 1180 px:** rail, stage, status desk.
+  - **1180 px and below:** the status desk becomes a drawer.
+  - **760 px and below:** the rail becomes a bottom tab bar; the hero stacks.
+  - **440 px and below:** compact masthead, full-width CTAs, and the prompt-bar chips scroll sideways.
+  - The hero uses container queries, so it adapts to the stage width rather than the window.
 
 ---
 
