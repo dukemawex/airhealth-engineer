@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { AirTwin } from "./airTwin";
 import { SPACE_TYPES, type SpaceType } from "./space";
 import { SceneAnalysisSchema } from "./vision/scene";
 import type { ChatMessage, ToolCall } from "./meta/types";
@@ -270,6 +271,8 @@ export interface EngineeringChecks {
   space?: SpaceType;
   /** Indoor-only items skipped for this space, with the reason. */
   notApplicable?: string[];
+  /** Modelled before/after PM2.5 curve for indoor rooms (a model, not a measurement). */
+  airTwin?: AirTwin;
   warnings: string[];
 }
 

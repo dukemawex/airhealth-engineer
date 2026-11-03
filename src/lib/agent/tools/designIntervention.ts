@@ -1,3 +1,4 @@
+import { simulateAirTwin, twinTarget } from "../../airTwin";
 import {
   INDOOR_VENT_MODES,
   InterventionDesignSchema,
@@ -119,9 +120,23 @@ export function computeChecks(design: InterventionDesign, session: Session, spac
     }
   }
 
+  const airTwin =
+    pm25 !== undefined && roomVolumeM3 !== undefined && requiredCadrM3h !== undefined
+      ? (simulateAirTwin({
+          outdoorPm25: pm25,
+          roomVolumeM3,
+          cadrM3h: requiredCadrM3h,
+          targetPm25: twinTarget(Boolean(assessment?.sensitiveGroup)),
+          indoorPm25: session.profile?.recentData?.indoorPm25,
+          startIso: nowIso(),
+          timezone: session.location?.timezone ?? aq?.location.timezone,
+        }) ?? undefined)
+      : undefined;
+
   return {
     roomVolumeM3,
     targetAirChangesPerHour: targetAch,
+    airTwin,
     requiredCadrM3h,
     requiredCadrCfm: requiredCadrM3h !== undefined ? Math.round(requiredCadrM3h * M3H_TO_CFM) : undefined,
     outdoorPm25: pm25,

@@ -1,6 +1,7 @@
 import { INDOOR_VENT_MODES, type DeviceCommand, type EngineeringChecks, type InterventionDesign } from "@/lib/domain";
 import { INDOOR_ONLY_DEVICES, isOpenSpace, notApplicableNote, SPACE_LABEL, type SpaceType } from "@/lib/space";
 import { fmtNum, humanize } from "../format";
+import { AirTwinChart } from "./AirTwinChart";
 
 const MODE_LABEL: Record<string, string> = {
   open_dispersion: "Open dispersion",
@@ -44,6 +45,8 @@ export function planView(design: Partial<InterventionDesign>, checks?: Engineeri
     schedule,
     deviceCommands: (design.deviceCommands ?? []).filter((c) => !open || !indoorDevices.has(c.deviceType)),
     exposureSteps: exposureStepsOf(design),
+    // The air twin models an enclosed room only.
+    airTwin: open ? undefined : checks?.airTwin,
   };
 }
 
@@ -136,6 +139,13 @@ export function InterventionPlanCard({
             {f?.notes && <p className="card-sub">{f.notes}</p>}
           </div>
         )
+      )}
+
+      {view.airTwin && (
+        <div className="card-section">
+          <h4>Air twin · before / after</h4>
+          <AirTwinChart twin={view.airTwin} />
+        </div>
       )}
 
       {v && (
