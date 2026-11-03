@@ -15,6 +15,7 @@ import { ApprovalModal } from "./cards/ApprovalModal";
 import { Composer } from "./chat/Composer";
 import { MessageBubble } from "./chat/MessageBubble";
 import { JudgePanel } from "./judge/JudgePanel";
+import { StudioGallery, type GalleryScene } from "./studio/StudioGallery";
 import { useJudgeMode } from "@/lib/client/judge";
 import { totalTraces } from "@/lib/traceStats";
 import { AccessDialog } from "./layout/AccessDialog";
@@ -402,6 +403,14 @@ export function AgentApp() {
   const newsPlace = status?.location?.name ?? status?.location?.area ?? undefined;
   const monitoringOn = Boolean(status?.monitoring?.enabled && status.location);
   const lastIsUser = messages.at(-1)?.role === "user";
+  const galleryScenes: GalleryScene[] = messages.flatMap((m) =>
+    m.role === "user" && m.metadata?.scene?.imageUrl ? [{ id: m.id, imageUrl: m.metadata.scene.imageUrl, result: m.metadata.scene.result }] : [],
+  );
+  // Image mode in the prompt bar opens the newest reading's "air today" card builder.
+  const openCard = () => {
+    const btns = document.querySelectorAll<HTMLButtonElement>(".share-btn");
+    btns[btns.length - 1]?.click();
+  };
   const traceTotals = totalTraces(messages.flatMap((m) => m.parts.flatMap((p) => (p.type === "data-trace" ? [p.data] : []))));
 
   return (
@@ -446,7 +455,7 @@ export function AgentApp() {
                   <>
                     <header className="briefing-head">
                       <span className="kicker">
-                        Live briefing
+                        Live session
                         {placeLabel && (
                           <>
                             <span className="sep" aria-hidden="true" />
@@ -454,9 +463,10 @@ export function AgentApp() {
                           </>
                         )}
                       </span>
-                      <h1>{status?.combined?.headline ?? "Your air-health briefing"}</h1>
+                      <h1>{status?.combined?.headline ?? "Your indoor-air control session"}</h1>
                       <hr className="rule-double" />
                     </header>
+                    <StudioGallery scenes={galleryScenes} />
                     {messages.map((m) => (
                       <MessageBubble
                         key={m.id}
@@ -492,6 +502,7 @@ export function AgentApp() {
               busy={busy}
               onSend={(t, profile) => send(t, undefined, profile)}
               onAttach={(f, note) => void analyzeMedia(f, note)}
+              onCard={history.length > 0 ? openCard : undefined}
               showHealthChips={messages.length > 0}
               onStop={stop}
               disabledReason={pending.length > 0 ? "Approve or reject the pending device action to continue." : undefined}

@@ -82,9 +82,9 @@ export function profileFromChips(chips: HealthChip[]): HealthProfile | undefined
   return out;
 }
 
-/* ---- Composer: chips manage one "My health context: …" line inside the message ---- */
+/* ---- Composer: chips manage one "My sensitivity profile: …" line inside the message ---- */
 
-const CONTEXT_LINE = /^my health context:\s*(.*?)\.?\s*$/im;
+const CONTEXT_LINE = /^my (?:sensitivity profile|health context):\s*(.*?)\.?\s*$/im;
 
 export function composerContext(message: string): string {
   return CONTEXT_LINE.exec(message)?.[1] ?? "";
@@ -94,5 +94,5 @@ export function toggleComposerChip(message: string, chip: HealthChip): string {
   const ctx = toggleChipText(composerContext(message), chip);
   const without = message.replace(CONTEXT_LINE, "").replace(/\n{2,}/g, "\n").trim();
   if (!ctx) return without;
-  return `${without ? `${without}\n` : ""}My health context: ${ctx}.`;
+  return `${without ? `${without}\n` : ""}My sensitivity profile: ${ctx}.`;
 }

@@ -26,8 +26,8 @@ export default function OpengraphImage() {
           <div style={{ fontSize: 76, fontWeight: 700, letterSpacing: "-0.02em" }}>AirHealth Engineer</div>
         </div>
         <div style={{ marginTop: 40, fontSize: 36, color: "#ccfbf1", maxWidth: 940, lineHeight: 1.3 }}>
-          An autonomous Muse Spark agent that turns live air quality and your health context into engineered,
-          human-approved protection.
+          An agent that engineers your indoor air: Muse Spark turns live air data, the forecast and a photo of your room into
+          human-approved purifier, window and HVAC control. Not medical advice.
         </div>
       </div>
     ),

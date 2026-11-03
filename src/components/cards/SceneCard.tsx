@@ -41,6 +41,23 @@ function Region({ r, colour, showLabel }: { r: OverlayRegion; colour: string; sh
   );
 }
 
+/** Compact photo + mask overlay for the studio gallery (decorative; the full card carries the details). */
+export function SceneThumb({ imageUrl, result }: { imageUrl: string; result: VisionResult }) {
+  const { overlay } = result;
+  const labels = [...new Set(overlay.regions.map((r) => r.label))];
+  return (
+    <div className="scene-stage thumb-stage" style={{ aspectRatio: `${overlay.width} / ${overlay.height}` }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={imageUrl} alt="" />
+      <svg viewBox={`0 0 ${overlay.width} ${overlay.height}`} preserveAspectRatio="none" aria-hidden="true">
+        {overlay.regions.map((r) => (
+          <Region key={r.id} r={r} colour={colourFor(r.label, labels)} showLabel={false} />
+        ))}
+      </svg>
+    </div>
+  );
+}
+
 /** Photo + SAM 3.1 (or Muse Spark grounding) overlay + the structured analysis. */
 export function SceneCard({ imageUrl, result, judge = false }: { imageUrl?: string; result: VisionResult; judge?: boolean }) {
   const { analysis: a, overlay } = result;

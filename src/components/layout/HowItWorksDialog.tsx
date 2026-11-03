@@ -24,7 +24,7 @@ export function HowItWorksDialog({ open, onClose }: { open: boolean; onClose: ()
         </div>
         <ol className="steps">
           <li>
-            <strong>You describe your situation</strong> in plain language: where you are and anything relevant about your health.
+            <strong>You describe your situation</strong> in plain language: where you are, your room, and an optional sensitivity profile that only tunes device thresholds (not medical advice).
           </li>
           <li>
             <strong>Muse Spark plans the next step.</strong> Every reasoning step is a call to Meta&apos;s Muse Spark model through the

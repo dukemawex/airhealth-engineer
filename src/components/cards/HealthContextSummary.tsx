@@ -16,10 +16,10 @@ export function HealthContextSummary({
   const conditions = profile?.conditions ?? [];
   const symptoms = profile?.symptoms ?? [];
   return (
-    <section className="card" data-tone={assessment?.urgentCareAdvised ? "danger" : undefined} aria-label="Health context">
+    <section className="card" data-tone={assessment?.urgentCareAdvised ? "danger" : undefined} aria-label="Sensitivity profile">
       <div className="card-header">
         <div>
-          <span className="kicker">Your health context</span>
+          <span className="kicker">Your sensitivity profile</span>
           <h3 className="card-title">
             {assessment?.urgentCareAdvised ? "Red flags reported" : assessment?.sensitiveGroup ? "Extra protection advised" : "What you shared"}
           </h3>

@@ -82,7 +82,7 @@ export function assessHealth(profile: HealthProfile) {
 export const getHealthContextTool = defineTool({
   name: "getHealthContext",
   description:
-    "Record and assess the user's health context (conditions, symptoms, age group, sensitive household members, outdoor activities, medications, recent vitals/indoor sensor data). Returns sensitivity, red-flag symptoms that need urgent medical care, and engineering thresholds. Call when the user shares health information or before designing an intervention.",
+    "Record and assess the user's sensitivity profile (conditions, symptoms, age group, sensitive household members, outdoor activities, medications, recent vitals/indoor sensor data). Returns sensitivity, red-flag symptoms that need urgent medical care, and engineering thresholds. Call when the user shares health information or before designing an intervention.",
   schema: getHealthContextSchema,
   requiresApproval: false,
   async execute(args, ctx) {

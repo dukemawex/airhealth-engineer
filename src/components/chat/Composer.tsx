@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useSpeakPreference } from "@/lib/client/speech";
 import { useVoiceInput } from "@/lib/client/voice";
 import type { HealthProfile } from "@/lib/domain";
@@ -25,6 +25,24 @@ function SpeakerIcon({ on }: { on: boolean }) {
   );
 }
 
+function SparkIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.3 6.3l2.5 2.5M15.2 15.2l2.5 2.5M6.3 17.7l2.5-2.5M15.2 8.8l2.5-2.5" />
+    </svg>
+  );
+}
+
+function CardIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="5" y="3" width="14" height="18" rx="3" />
+      <circle cx="12" cy="9.5" r="2.5" />
+      <path d="M8.5 15h7M9.5 18h5" />
+    </svg>
+  );
+}
+
 function CameraIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -42,7 +60,10 @@ export function Composer({
   disabledReason,
   showHealthChips = false,
   onAttach,
+  onCard,
 }: {
+  /** Image mode: open the Muse Image "air today" card for the latest reading (absent until there is one). */
+  onCard?: () => void;
   /** Photo or video chosen: the current text is passed along as the note. */
   onAttach?: (file: File, note: string) => void;
   disabled: boolean;
@@ -62,6 +83,19 @@ export function Composer({
     ref.current?.focus();
   });
   const speakPref = useSpeakPreference();
+
+  // The studio hero's "Snap your room" / "Speak" buttons drive the same single input pipeline.
+  const startVoice = dictation.start;
+  useEffect(() => {
+    const attach = () => fileRef.current?.click();
+    const voice = () => startVoice();
+    window.addEventListener("airhealth:attach", attach);
+    window.addEventListener("airhealth:voice", voice);
+    return () => {
+      window.removeEventListener("airhealth:attach", attach);
+      window.removeEventListener("airhealth:voice", voice);
+    };
+  }, [startVoice]);
 
   const submit = (e?: FormEvent) => {
     e?.preventDefault();
@@ -84,7 +118,7 @@ export function Composer({
     disabledReason ??
     "Enter to send · Shift+Enter for a new line · Device actions always ask for your approval first.";
   return (
-    <div className="composer" data-listening={dictation.listening || dictation.transcribing}>
+    <div className="composer prompt-bar" data-listening={dictation.listening || dictation.transcribing}>
       {showHealthChips && chipsOpen && (
         <div id="composer-chips" className="composer-chips">
           <HealthChips
@@ -98,7 +132,7 @@ export function Composer({
           />
         </div>
       )}
-      <form onSubmit={submit} aria-label="Send a message">
+      <form onSubmit={submit} aria-label="Send a message" className="prompt-shell">
         <label htmlFor="composer-input" className="sr-only">
           Message AirHealth Engineer
         </label>
@@ -110,7 +144,7 @@ export function Composer({
             rows={1}
             value={text}
             maxLength={8000}
-            placeholder={dictation.listening ? "Listening… speak now" : "Describe where you are, how you feel, or ask about your plan…"}
+            placeholder={dictation.listening ? "Listening… speak now" : "Where are you, what's the room like, what should the devices do?"}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={onKey}
             aria-describedby="composer-hint composer-interim"
@@ -119,85 +153,117 @@ export function Composer({
             {dictation.listening || dictation.transcribing ? dictation.interim || "Listening…" : ""}
           </p>
         </div>
-        {onAttach && (
-          <>
-            <button
-              type="button"
-              className="btn btn-secondary icon-btn attach-btn"
-              onClick={() => fileRef.current?.click()}
-              disabled={disabled}
-              aria-label="Add a photo or video of your space"
-              title="Snap or upload a photo or short video of your space"
-            >
-              <CameraIcon />
+        <div className="prompt-row">
+          <div className="mode-chips" role="group" aria-label="Meta models and input modes">
+            <span className="mode-chip" data-static="true" title="Every reasoning step runs on Meta Muse Spark">
+              <SparkIcon />
+              Muse Spark
+            </span>
+            {onAttach && (
+              <>
+                <button
+                  type="button"
+                  className="mode-chip attach-btn"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={disabled}
+                  aria-label="Add a photo or video of your space (outlined by SAM 3.1)"
+                  title="Snap or upload a photo or short video of your space. SAM 3.1 outlines haze, windows and devices."
+                >
+                  <CameraIcon />
+                  <span>
+                    Photo <span className="chip-model">SAM 3.1</span>
+                  </span>
+                </button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*,video/*"
+                  hidden
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = "";
+                    if (!f || disabled) return;
+                    if (dictation.listening) dictation.stop();
+                    onAttach(f, text.trim());
+                    setText("");
+                  }}
+                />
+              </>
+            )}
+            {dictation.supported && (
+              <button
+                type="button"
+                className="mode-chip mic-btn"
+                onClick={dictation.listening ? dictation.stop : dictation.start}
+                aria-pressed={dictation.listening}
+                aria-label={dictation.listening ? "Stop voice input" : "Speak your message"}
+                title={
+                  dictation.listening
+                    ? "Stop voice input"
+                    : dictation.engine === "muse"
+                      ? "Speak your message (transcribed by Muse Voice Transcribe)"
+                      : "Speak your message (browser dictation)"
+                }
+                data-engine={dictation.engine}
+                aria-busy={dictation.transcribing}
+                disabled={(disabled && !dictation.listening) || dictation.transcribing}
+              >
+                <MicIcon />
+                <span aria-hidden="true">
+                  {dictation.listening ? "Stop" : "Voice"} <span className="chip-model">{dictation.engine === "muse" ? "Muse" : "Web"}</span>
+                </span>
+              </button>
+            )}
+            {onCard && (
+              <button
+                type="button"
+                className="mode-chip"
+                onClick={onCard}
+                title="Make a shareable “air today” card with Muse Image from your latest reading"
+              >
+                <CardIcon />
+                <span>
+                  Air card <span className="chip-model">Muse Image</span>
+                </span>
+              </button>
+            )}
+            {showHealthChips && (
+              <button
+                type="button"
+                className="mode-chip"
+                aria-expanded={chipsOpen}
+                aria-controls="composer-chips"
+                onClick={() => setChipsOpen((o) => !o)}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 7h10M4 12h16M4 17h7" />
+                  <circle cx="17" cy="7" r="2" />
+                  <circle cx="14" cy="17" r="2" />
+                </svg>
+                <span>Sensitivity</span>
+              </button>
+            )}
+          </div>
+          {busy ? (
+            <button type="button" className="btn btn-secondary send-btn" onClick={onStop}>
+              Stop
             </button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*,video/*"
-              hidden
-              tabIndex={-1}
-              aria-hidden="true"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                e.target.value = "";
-                if (!f || disabled) return;
-                if (dictation.listening) dictation.stop();
-                onAttach(f, text.trim());
-                setText("");
-              }}
-            />
-          </>
-        )}
-        {dictation.supported && (
-          <button
-            type="button"
-            className="btn btn-secondary icon-btn mic-btn"
-            onClick={dictation.listening ? dictation.stop : dictation.start}
-            aria-pressed={dictation.listening}
-            aria-label={dictation.listening ? "Stop voice input" : "Speak your message"}
-            title={
-              dictation.listening
-                ? "Stop voice input"
-                : dictation.engine === "muse"
-                  ? "Speak your message (transcribed by Muse Voice Transcribe)"
-                  : "Speak your message (browser dictation)"
-            }
-            data-engine={dictation.engine}
-            aria-busy={dictation.transcribing}
-            disabled={(disabled && !dictation.listening) || dictation.transcribing}
-          >
-            <MicIcon />
-          </button>
-        )}
-        {busy ? (
-          <button type="button" className="btn btn-secondary" onClick={onStop}>
-            Stop
-          </button>
-        ) : (
-          <button type="submit" className="btn btn-primary" disabled={disabled || !text.trim()}>
-            Send
-          </button>
-        )}
+          ) : (
+            <button type="submit" className="btn btn-primary send-btn" disabled={disabled || !text.trim()}>
+              <span>Send</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12h14M13 6l6 6-6 6" />
+              </svg>
+            </button>
+          )}
+        </div>
       </form>
       <div className="composer-meta">
         <p id="composer-hint" className="composer-hint" data-tone={dictation.error ? "error" : undefined}>
           {hint}
         </p>
-        {showHealthChips && (
-          <button
-            type="button"
-            className="speak-toggle"
-            aria-expanded={chipsOpen}
-            aria-controls="composer-chips"
-            onClick={() => setChipsOpen((o) => !o)}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 21s-7.5-4.6-9.3-9.6C1.4 7.6 4 4 7.5 4c2 0 3.5 1.1 4.5 2.6C13 5.1 14.5 4 16.5 4 20 4 22.6 7.6 21.3 11.4 19.5 16.4 12 21 12 21Z" />
-            </svg>
-            <span>Health context</span>
-          </button>
-        )}
         {speakPref.supported && (
           <button
             type="button"

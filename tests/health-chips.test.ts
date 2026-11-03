@@ -56,7 +56,7 @@ describe("health chips", () => {
 
   it("manages one context line in the composer message", () => {
     let m = toggleComposerChip("How is the air?", chip("coughing"));
-    expect(m).toBe("How is the air?\nMy health context: coughing.");
+    expect(m).toBe("How is the air?\nMy sensitivity profile: coughing.");
     m = toggleComposerChip(m, chip("asthma"));
     expect(composerContext(m)).toBe("coughing, asthma");
     m = toggleComposerChip(toggleComposerChip(m, chip("coughing")), chip("asthma"));

@@ -14,7 +14,7 @@ export interface CombinedStatus {
   steps: Array<{ key: "location" | "air" | "health" | "plan" | "approval" | "monitoring"; done: boolean; label: string; detail?: string }>;
 }
 
-/** Combine air quality, health context and intervention state into one status. Pure function. */
+/** Combine air quality, sensitivity profile and intervention state into one status. Pure function. */
 export function combineStatus(input: {
   session: Session;
   aq?: AirQualitySnapshot;
@@ -66,7 +66,7 @@ export function combineStatus(input: {
     steps: [
       { key: "location", done: Boolean(session.location), label: "Location", detail: session.location ? shortPlace(session.location) : undefined },
       { key: "air", done: Boolean(aq), label: "Air quality", detail: aq ? (aq.source === "openaq" ? "Measured (OpenAQ)" : "Modelled (CAMS)") : undefined },
-      { key: "health", done: Boolean(session.profile), label: "Health context", detail: session.profile ? (assessment?.sensitiveGroup ? "Sensitive group" : "Recorded") : undefined },
+      { key: "health", done: Boolean(session.profile), label: "Sensitivity profile", detail: session.profile ? (assessment?.sensitiveGroup ? "Sensitive group" : "Recorded") : undefined },
       { key: "plan", done: input.activeInterventions + input.proposedInterventions > 0, label: "Intervention plan", detail: input.activeInterventions > 0 ? "Active" : input.proposedInterventions > 0 ? "Proposed" : undefined },
       { key: "approval", done: input.executedActions > 0, label: "Approved actions", detail: input.pendingApprovals > 0 ? `${input.pendingApprovals} pending` : input.executedActions > 0 ? `${input.executedActions} executed` : undefined },
       { key: "monitoring", done: Boolean(mon?.lastCheckAt), label: "Monitoring", detail: mon?.lastCheckAt ? `Last check ${mon.lastCheckAt}` : session.location ? "Waiting for first re-check" : undefined },

@@ -14,15 +14,15 @@ type Preview =
   | { status: "found"; label: string; accuracyNote?: string }
   | { status: "notfound"; message: string };
 
-const TILES: Array<{ title: string; body: string; icon: ReactNode }> = [
+const LOOP: Array<{ title: string; body: string; icon: ReactNode }> = [
   {
-    title: "Measure",
-    body: "Live readings from the nearest OpenAQ station, or clearly labelled modelled data.",
+    title: "Sense",
+    body: "Live station readings (or clearly labelled CAMS model data), your voice and a photo of the room.",
     icon: <path d="M3 12h4l2-5 4 10 2-5h6" />,
   },
   {
-    title: "Engineer",
-    body: "Filter class, purifier CADR, ventilation timing and safer routes, with the maths shown.",
+    title: "Plan",
+    body: "Muse Spark reasons over the 72-hour forecast and plans purifier, window and HVAC steps.",
     icon: (
       <>
         <path d="M4 7h10M4 12h16M4 17h7" />
@@ -32,7 +32,7 @@ const TILES: Array<{ title: string; body: string; icon: ReactNode }> = [
     ),
   },
   {
-    title: "Approve & monitor",
+    title: "Approve & control",
     body: "Nothing touches a device until you approve it. Then the air keeps being checked.",
     icon: (
       <>
@@ -43,9 +43,64 @@ const TILES: Array<{ title: string; body: string; icon: ReactNode }> = [
   },
 ];
 
+/** Illustrative capability cards for the hero stage: artwork only, never data. */
+const STAGE: Array<{ model: string; title: string; art: ReactNode }> = [
+  {
+    model: "Muse Voice",
+    title: "Say where you are",
+    art: (
+      <g fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+        {[10, 22, 34, 46, 58, 70, 82, 94, 106].map((x, i) => (
+          <line key={x} x1={x} x2={x} y1={50 - [8, 18, 30, 14, 36, 22, 28, 12, 6][i]!} y2={50 + [8, 18, 30, 14, 36, 22, 28, 12, 6][i]!} />
+        ))}
+      </g>
+    ),
+  },
+  {
+    model: "SAM 3.1",
+    title: "Snap the haze",
+    art: (
+      <g>
+        <rect x="8" y="14" width="100" height="72" rx="8" fill="currentColor" opacity="0.12" />
+        <path d="M14 70c14-22 28-30 44-24s30-6 44-22v56H14Z" fill="currentColor" opacity="0.35" />
+        <path d="M58 28h34v30H58Z" fill="none" stroke="currentColor" strokeWidth="2.5" strokeDasharray="5 4" />
+        <circle cx="30" cy="34" r="8" fill="currentColor" opacity="0.5" />
+      </g>
+    ),
+  },
+  {
+    model: "Muse Spark",
+    title: "Plan 72 hours",
+    art: (
+      <g fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M6 70 22 52l14 10 16-30 16 18 14-12 14 22 12-8" />
+        <path d="M6 86h104" opacity="0.4" />
+        <circle cx="52" cy="32" r="5" fill="currentColor" />
+      </g>
+    ),
+  },
+  {
+    model: "Muse Image",
+    title: "Share your air card",
+    art: (
+      <g>
+        <rect x="22" y="10" width="72" height="84" rx="10" fill="currentColor" opacity="0.18" />
+        <rect x="32" y="56" width="40" height="8" rx="4" fill="currentColor" opacity="0.7" />
+        <rect x="32" y="70" width="28" height="6" rx="3" fill="currentColor" opacity="0.45" />
+        <circle cx="58" cy="34" r="12" fill="currentColor" opacity="0.55" />
+      </g>
+    ),
+  },
+];
+
+/** Ask the composer to open its photo picker or microphone (keeps one input pipeline). */
+function composerAction(kind: "attach" | "voice") {
+  window.dispatchEvent(new CustomEvent(`airhealth:${kind}`));
+}
+
 /**
- * First-run screen: invites the user to share a location and health context.
- * Deliberately contains no example places or regional data.
+ * First-run studio screen: hero stage, template tiles and the scene form (location + optional
+ * sensitivity profile). Deliberately contains no example places, readings or regional data.
  */
 export function EmptyState({
   disabled,
@@ -114,7 +169,7 @@ export function EmptyState({
   const typed = place.trim();
   const canStart = Boolean(fix || typed) && preview.status !== "notfound";
   const healthText = health.trim();
-  const whoSentence = healthText ? ` My health context: ${healthText}.` : "";
+  const whoSentence = healthText ? ` My sensitivity profile: ${healthText}.` : "";
   const currentLocation = (f: Fix | null = fix): LocationQuery | undefined =>
     typed ? { city: typed } : f ? { latitude: f.latitude, longitude: f.longitude, accuracyMeters: f.accuracy } : undefined;
   const whereSentence = (f: Fix | null = fix) =>
@@ -128,7 +183,7 @@ export function EmptyState({
     e.preventDefault();
     if (!canStart) return;
     onStart({
-      message: `${whereSentence()}${whoSentence || " I haven't shared any health details yet."} Please check the air quality where I am and design an intervention to protect my health.`,
+      message: `${whereSentence()}${whoSentence} Please check the air where I am and engineer my indoor air: purifier, windows and ventilation to cut my exposure.`,
       location: currentLocation(),
       profile: profileFromChips(activeChips(health)),
     });
@@ -170,46 +225,106 @@ export function EmptyState({
             : { text: "Share your location for the nearest station, or type a place." };
 
   return (
-    <section className="front" aria-labelledby="empty-title">
-      <header className="front-head">
-        <span className="kicker">
-          Today&apos;s briefing<span className="sep" aria-hidden="true" />
-          <span className="dateline" suppressHydrationWarning>
-            {today || "Live"}
+    <section className="front studio-front" aria-labelledby="empty-title">
+      <div className="hero">
+        <div className="hero-copy">
+          <span className="eyebrow">
+            <span className="eyebrow-dot" aria-hidden="true" />
+            Indoor-air control agent
+            <span className="sep" aria-hidden="true" />
+            <span className="eyebrow-date" suppressHydrationWarning>
+              {today || "Live"}
+            </span>
           </span>
-        </span>
-        <h1 id="empty-title">Engineer cleaner air for your health</h1>
-        <p className="standfirst">
-          Share where you are and anything relevant about your health. Muse Spark checks live air quality, designs a filtration,
-          ventilation and exposure plan, and asks for your approval before touching any device.
-        </p>
-        <hr className="rule-double" />
-        <div className="starters" role="group" aria-labelledby="starters-title">
-          <span id="starters-title" className="kicker">
-            Quick start
-          </span>
-          <ul className="starter-list">
-            {STARTER_PROMPTS.map((p) => (
-              <li key={p.id}>
-                <button
-                  type="button"
-                  className="starter"
-                  onClick={() => void startWith(p)}
-                  disabled={disabled || geoState === "locating" || geoState === "naming"}
-                >
-                  {p.label}
-                  <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <h1 id="empty-title" className="display">
+            Engineer <span className="grad">your indoor air</span>
+          </h1>
+          <p className="standfirst">
+            Speak, snap your room, or share where you are. Muse Spark reads live air data and the 72-hour forecast, SAM 3.1
+            outlines haze and openings in your photo, and the agent plans purifier, window and HVAC steps that run only when you
+            approve them.
+          </p>
+          <div className="hero-ctas">
+            <button
+              type="button"
+              className="btn btn-primary btn-lg"
+              onClick={() => void startWith(STARTER_PROMPTS[0]!)}
+              disabled={disabled || geoState === "locating" || geoState === "naming"}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z" />
+                <circle cx="12" cy="9.5" r="2.5" />
+              </svg>
+              {geoState === "locating" ? "Locating…" : "Check my air now"}
+            </button>
+            <button type="button" className="btn btn-secondary btn-lg" onClick={() => composerAction("attach")} disabled={disabled}>
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z" />
+                <circle cx="12" cy="13.5" r="3.5" />
+              </svg>
+              Snap your room
+            </button>
+            <button type="button" className="btn btn-secondary btn-lg" onClick={() => composerAction("voice")} disabled={disabled}>
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="3" width="6" height="11" rx="3" />
+                <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+              </svg>
+              Speak
+            </button>
+          </div>
+          <p className="hero-note">An agent that engineers your indoor air, not medical advice.</p>
+        </div>
+        <div className="stage" aria-hidden="true">
+          <div className="stage-glow" />
+          {STAGE.map((c, i) => (
+            <figure className="stage-card" key={c.model} style={{ ["--i" as string]: i }}>
+              <svg viewBox="0 0 116 100" className="stage-art">
+                {c.art}
+              </svg>
+              <figcaption>
+                <span className="stage-model">{c.model}</span>
+                <span className="stage-title">{c.title}</span>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      </div>
+
+      <div className="templates" role="group" aria-labelledby="starters-title">
+        <div className="section-head">
+          <h2 id="starters-title" className="section-title">
+            Start from a template
+          </h2>
+          <span className="card-sub">One tap. The agent asks before any device moves.</span>
+        </div>
+        <ul className="template-grid">
+          {STARTER_PROMPTS.map((p, i) => (
+            <li key={p.id}>
+              <button
+                type="button"
+                className="template"
+                data-tone={i % 4}
+                onClick={() => void startWith(p)}
+                disabled={disabled || geoState === "locating" || geoState === "naming"}
+              >
+                <span className="template-thumb" aria-hidden="true" />
+                <span className="template-label">{p.label}</span>
+                <span className="template-go" aria-hidden="true">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M5 12h14M13 6l6 6-6 6" />
                   </svg>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </header>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+
       <div className="front-grid">
         <form className="empty-form" onSubmit={submit} aria-labelledby="start-title" aria-describedby="empty-privacy">
-          <h2 id="start-title">Start your briefing</h2>
+          <h2 id="start-title" className="section-title">
+            Set the scene
+          </h2>
           <div className="field">
             <span id="loc-label" style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>
               Your location
@@ -226,7 +341,7 @@ export function EmptyState({
                   <path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z" />
                   <circle cx="12" cy="9.5" r="2.5" />
                 </svg>
-                {geoState === "locating" ? "Locating…" : fix && !typed ? "Location shared ✓" : "Share my location"}
+                {geoState === "locating" ? "Locating…" : fix && !typed ? "Location shared ✓" : "Use my location"}
               </button>
               <span className="or" aria-hidden="true">
                 or
@@ -261,7 +376,7 @@ export function EmptyState({
             </span>
           </div>
           <div className="field">
-            <label htmlFor="health">Health context (optional)</label>
+            <label htmlFor="health">Sensitivity profile (optional)</label>
             <textarea
               id="health"
               className="textarea"
@@ -269,29 +384,29 @@ export function EmptyState({
               value={health}
               onChange={(e) => setHealth(e.target.value)}
               maxLength={1500}
-              placeholder="Tap suggestions below or type anything relevant: age group, medications, plans for today"
+              placeholder="Tap suggestions below or type: age group, asthma, who shares the room, plans for today"
               aria-describedby="health-hint"
             />
             <HealthChips text={health} onToggle={(c) => setHealth((h) => toggleChipText(h, c))} disabled={disabled} />
             <span id="health-hint" className="hint">
-              Used only to tailor thresholds and precautions. Not a diagnosis.
+              Only tunes device thresholds and exposure windows. Not a diagnosis, not medical advice.
             </span>
           </div>
           <div className="actions" style={{ justifyContent: "space-between" }}>
             <span id="empty-privacy" className="card-sub">
-              Or just type in the box below.
+              Or just use the prompt bar below.
             </span>
             <button type="submit" className="btn btn-primary" disabled={!canStart || disabled}>
-              Start assessment
+              Engineer my air
             </button>
           </div>
         </form>
-        <aside aria-labelledby="method-title">
-          <h2 id="method-title" className="kicker" style={{ marginBottom: "var(--space-3)" }}>
-            In this briefing
+        <aside aria-labelledby="method-title" className="loop-card">
+          <h2 id="method-title" className="section-title">
+            How the loop closes
           </h2>
           <ul className="tiles">
-            {TILES.map((t) => (
+            {LOOP.map((t) => (
               <li className="tile" key={t.title}>
                 <span className="tile-icon">
                   <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
@@ -305,7 +420,7 @@ export function EmptyState({
               </li>
             ))}
           </ul>
-          <p className="front-note">Decision support only, not medical advice. Seek urgent care for severe symptoms.</p>
+          <p className="front-note">Environment and device control only, not medical advice. Seek urgent care for severe symptoms.</p>
         </aside>
       </div>
     </section>

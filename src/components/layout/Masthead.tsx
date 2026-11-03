@@ -1,6 +1,6 @@
 "use client";
 
-import { useToday } from "@/lib/client/useToday";
+import { useTheme } from "@/lib/client/theme";
 import { Logo } from "../brand/Logo";
 
 function LiveBadge({ on, label, short, detail }: { on: boolean | "checking"; label: string; short?: string; detail: string }) {
@@ -24,7 +24,7 @@ function LiveBadge({ on, label, short, detail }: { on: boolean | "checking"; lab
   );
 }
 
-/** Editorial masthead: dateline strip with live badges, then the wordmark and pill actions. */
+/** Studio top bar: logo + wordmark, live badges, and pill actions (theme, judge, guide, new). */
 export function Masthead({
   agentOnline,
   agentDetail,
@@ -46,15 +46,19 @@ export function Masthead({
   onNew: () => void;
   hasConversation: boolean;
 }) {
-  const today = useToday();
+  const { theme, toggle } = useTheme();
   return (
     <header className="masthead">
-      <div className="masthead-strip">
-        <span className="dateline" suppressHydrationWarning>
-          {today || "\u00a0"}
-        </span>
-        <span className="strip-sep" aria-hidden="true" />
-        <span className="strip-note">Live air-health briefing · reasoning by Muse Spark · every device action approved by you</span>
+      <div className="masthead-main">
+        <div className="wordmark">
+          <Logo size={34} />
+          <span className="wordmark-text">
+            AirHealth <em>Engineer</em>
+          </span>
+          <span className="studio-tag" aria-hidden="true">
+            Studio
+          </span>
+        </div>
         <div className="live-badges" aria-label="System status" role="group">
           <LiveBadge
             on={agentOnline === null ? "checking" : agentOnline}
@@ -69,16 +73,26 @@ export function Masthead({
             detail={monitoringDetail}
           />
         </div>
-      </div>
-      <div className="masthead-main">
-        <p className="masthead-tag">Cleaner air, engineered for you.</p>
-        <div className="wordmark">
-          <Logo size={40} />
-          <span className="wordmark-text">
-            AirHealth <em>Engineer</em>
-          </span>
-        </div>
         <div className="masthead-actions">
+          <button
+            type="button"
+            className="btn btn-secondary icon-btn theme-toggle"
+            onClick={toggle}
+            aria-pressed={theme === "light"}
+            aria-label="Light mode"
+            title={theme === "light" ? "Switch to the dark studio" : "Switch to light mode"}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              {theme === "light" ? (
+                <path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5Z" />
+              ) : (
+                <>
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+                </>
+              )}
+            </svg>
+          </button>
           {onToggleJudge && (
             <button
               type="button"

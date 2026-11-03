@@ -120,13 +120,13 @@ export function StatusSidebar({
         )}
       </NewsSection>
 
-      <NewsSection id="sb-health" title="Your health context">
+      <NewsSection id="sb-health" title="Sensitivity profile">
         {skeleton ? (
           <Skeleton />
         ) : status?.profileSummary ? (
           <HealthContextSummary profile={status.profileSummary} assessment={status.healthAssessment} compact />
         ) : (
-          <p className="sidebar-empty">Anything you share about your health shapes the thresholds. Nothing shared yet.</p>
+          <p className="sidebar-empty">Your sensitivity profile (age group, asthma, household) only tunes device thresholds. Nothing shared yet. Not medical advice.</p>
         )}
       </NewsSection>
 

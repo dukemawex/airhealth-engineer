@@ -35,6 +35,8 @@ export function ShareCardButton({ input }: { input: ShareInput }) {
       const art = await fetchShareArt(input, abort.current.signal);
       const blob = await renderShareCard(input, art.image);
       setState({ stage: "ready", url: URL.createObjectURL(blob), blob, art: art.image ? "muse-image" : "gradient", ms: art.latencyMs });
+      // Add it to the studio gallery (kept in this tab only; nothing is uploaded).
+      window.dispatchEvent(new CustomEvent("airhealth:card", { detail: { blob, place: input.place } }));
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
       setState({ stage: "error", message: err instanceof Error ? err.message : "Could not build the card." });

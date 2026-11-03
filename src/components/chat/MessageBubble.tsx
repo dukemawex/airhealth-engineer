@@ -40,7 +40,7 @@ export function MessageBubble({
   if (message.role === "user") {
     const text = message.parts.map((p) => (p.type === "text" ? p.text : "")).join("");
     return (
-      <article className="msg msg-user" aria-label="You said">
+      <article className="msg msg-user" aria-label="You said" data-msg-id={message.id}>
         <span className="msg-label" aria-hidden="true">
           You
         </span>
