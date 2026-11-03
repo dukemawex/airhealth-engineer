@@ -15,6 +15,7 @@ import {
   trackHasTorch,
 } from "@/lib/client/camera";
 import { decideLiveTick, frameDiff, initialLiveState, LIVE_DEFAULTS, lumaSignature } from "@/lib/liveScene";
+import { LiveSamOverlay } from "./LiveSamOverlay";
 
 /** What the app did with one live frame. */
 export type LiveFrameResult =
@@ -63,7 +64,7 @@ export function CameraSheet({
   /** Open the OS camera / file picker instead (shown when live capture fails). */
   onFallback: () => void;
   /** Live mode: analyse a frame (Muse Spark + SAM) and update the plan if the scene changed. */
-  onLiveFrame?: (file: File, opts: { baseline: boolean }) => Promise<LiveFrameResult>;
+  onLiveFrame?: (file: File, opts: { baseline: boolean; samChanges?: string[] }) => Promise<LiveFrameResult>;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -82,6 +83,14 @@ export function CameraSheet({
   const [liveNote, setLiveNote] = useState<string>("");
   const [reads, setReads] = useState(0);
   const [events, setEvents] = useState<LiveEvent[]>([]);
+  const [outlines, setOutlines] = useState(false);
+  const [outlineRun, setOutlineRun] = useState(0);
+  /** Mask-derived changes (SAM 3.1) waiting for the next plan read. */
+  const samPending = useRef<string[]>([]);
+  const liveRef = useRef(false);
+  useEffect(() => {
+    liveRef.current = live;
+  }, [live]);
   const liveState = useRef(initialLiveState());
   const lastSig = useRef<Float32Array | null>(null);
   const eventId = useRef(0);
@@ -179,6 +188,7 @@ export function CameraSheet({
       if (document.visibilityState === "hidden" && streamRef.current) {
         release();
         setLive(false);
+        setOutlines(false);
         setPhase("error");
         setProblem("aborted");
       }
@@ -197,6 +207,8 @@ export function CameraSheet({
   const close = () => {
     stop();
     setLive(false);
+    setOutlines(false);
+    samPending.current = [];
     setEvents([]);
     setLiveNote("");
     setShot(null);
@@ -230,7 +242,8 @@ export function CameraSheet({
       tctx.drawImage(v, 0, 0, thumb.width, thumb.height);
       const sig = lumaSignature(tctx.getImageData(0, 0, thumb.width, thumb.height).data, thumb.width * thumb.height);
       const diff = lastSig.current ? frameDiff(lastSig.current, sig) : null;
-      const d = decideLiveTick(liveState.current, Date.now(), diff);
+      const force = samPending.current.length > 0;
+      const d = decideLiveTick(liveState.current, Date.now(), diff, { force });
       if (!d.analyze) {
         if (d.reason === "budget_spent") {
           setLive(false);
@@ -240,14 +253,15 @@ export function CameraSheet({
         return;
       }
       liveState.current = { ...liveState.current, inFlight: true };
-      setLiveNote(d.reason === "baseline" ? "Reading the scene…" : "Scene changed: re-reading…");
+      setLiveNote(d.reason === "baseline" ? "Reading the scene…" : force ? "SAM 3.1 saw a change: re-reading…" : "Scene changed: re-reading…");
+      const samChanges = samPending.current;
       try {
         const file = await grab(v);
         if (!file || cancelled) {
           liveState.current = { ...liveState.current, inFlight: false };
           return;
         }
-        const r = await handler(file, { baseline: d.reason === "baseline" });
+        const r = await handler(file, { baseline: d.reason === "baseline", samChanges: d.reason === "baseline" ? [] : samChanges });
         if (cancelled) return;
         if (r.kind === "skipped") {
           // Nothing was sent: keep the old baseline so the change is picked up later.
@@ -255,6 +269,7 @@ export function CameraSheet({
           setLiveNote(r.message);
           return;
         }
+        samPending.current = samPending.current.filter((c) => !samChanges.includes(c));
         liveState.current = { analyses: liveState.current.analyses + 1, lastAnalysisAt: Date.now(), inFlight: false };
         lastSig.current = sig;
         setReads(liveState.current.analyses);
@@ -287,11 +302,35 @@ export function CameraSheet({
     }
     liveState.current = initialLiveState();
     lastSig.current = null;
+    samPending.current = [];
+    if (!outlines) toggleOutlines();
     setReads(0);
     setEvents([]);
     setLiveNote("Starting live mode…");
     setLive(true);
   };
+
+  const toggleOutlines = () => {
+    if (outlines) {
+      setOutlines(false);
+      return;
+    }
+    samPending.current = [];
+    setOutlineRun((n) => n + 1);
+    setOutlines(true);
+  };
+
+  /** SAM 3.1 mask states changed: log it, and in Live mode queue a plan update (cooldown and read budget still apply). */
+  const onSamChanges = useCallback(
+    (changes: string[]) => {
+      const plain = changes.map((c) => c.replace(/^SAM 3\.1: /, ""));
+      if (liveRef.current) {
+        samPending.current = [...new Set([...samPending.current, ...changes])];
+        pushEvent("change", `SAM 3.1: ${plain.join("; ")} → updating the plan`);
+      } else pushEvent("info", `SAM 3.1: ${plain.join("; ")} (turn on Live to update the plan)`);
+    },
+    [pushEvent],
+  );
 
   const flip = () => {
     const f = otherFacing(facing);
@@ -378,6 +417,18 @@ export function CameraSheet({
               Frame windows, vents, the purifier and any haze. Muse Spark reads the scene, SAM 3.1 outlines it, and device actions still wait for your approval.
             </p>
           </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={outlines}
+            className="live-toggle outline-toggle"
+            data-on={outlines}
+            onClick={toggleOutlines}
+            disabled={phase !== "live"}
+            title="Draw SAM 3.1 outlines on the live picture (keyframes every ~1.5 s, tracked on-device in between)"
+          >
+            <span className="live-knob" aria-hidden="true" /> Outlines
+          </button>
           {onLiveFrame && (
             <button
               type="button"
@@ -439,7 +490,8 @@ export function CameraSheet({
               </div>
             </div>
           )}
-          {phase === "live" && <div className="camera-frame" aria-hidden="true" />}
+          {phase === "live" && !outlines && <div className="camera-frame" aria-hidden="true" />}
+          {phase === "live" && outlines && <LiveSamOverlay key={outlineRun} videoRef={videoRef} mirrored={facing === "user"} onChanges={onSamChanges} />}
           {(live || events.length > 0) && (
             <div className="live-panel" data-testid="live-panel">
               {live && (
@@ -509,7 +561,9 @@ export function CameraSheet({
           The camera turns off when you close this sheet or switch tabs.{" "}
           {live
             ? `Live mode sends a frame only when the scene changes (at most ${LIVE_DEFAULTS.maxAnalyses} reads); device actions still wait for your approval.`
-            : "Photos are only sent when you tap Use photo or turn on Live."}
+            : outlines
+              ? "Outlines send a small keyframe to SAM 3.1 about every 1.5 s (capped per session, paused when you switch tabs)."
+              : "Photos are only sent when you tap Use photo or turn on Live or Outlines."}
         </p>
       </div>
     </dialog>

@@ -79,7 +79,7 @@ export function Composer({
   /** Photo or video chosen: the current text is passed along as the note. */
   onAttach?: (file: File, note: string) => void;
   /** Live camera mode handler (scene re-reads that update the plan). */
-  onLiveFrame?: (file: File, opts: { baseline: boolean }) => Promise<LiveFrameResult>;
+  onLiveFrame?: (file: File, opts: { baseline: boolean; samChanges?: string[] }) => Promise<LiveFrameResult>;
   disabled: boolean;
   busy: boolean;
   onSend: (text: string, profile?: HealthProfile) => void;

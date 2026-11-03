@@ -154,7 +154,7 @@ export async function* readResponsesEvents(body: ReadableStream<Uint8Array>): As
 
 export async function segmentImage(
   deps: MediaDeps,
-  input: { imageDataUrl: string; phrase: string; maxRegions?: number },
+  input: { imageDataUrl: string; phrase: string; maxRegions?: number; includeConfidence?: boolean; timeoutMs?: number },
 ): Promise<{ regions: OverlayRegion[]; width: number; height: number }> {
   assertImageDataUrl(input.imageDataUrl);
   const fetchImpl = deps.fetchImpl ?? fetch;
@@ -167,7 +167,7 @@ export async function segmentImage(
       body: JSON.stringify({
         model: META_MODELS.segmentation,
         stream: true,
-        metadata: { mask_encoding: "one_bit" },
+        metadata: input.includeConfidence ? { mask_encoding: "one_bit", include_confidence: "true" } : { mask_encoding: "one_bit" },
         input: [
           {
             type: "message",
@@ -180,7 +180,7 @@ export async function segmentImage(
         ],
       }),
     },
-    Math.min(deps.cfg.timeoutMs, 45_000),
+    Math.min(deps.cfg.timeoutMs, input.timeoutMs ?? 45_000),
   );
   if (!res.ok || !res.body) await fail(res, "SAM 3.1");
   const result = await parseImageStream(readResponsesEvents(res.body!)).finalResult;

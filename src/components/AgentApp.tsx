@@ -374,7 +374,7 @@ export function AgentApp() {
         ? "Approve or reject the pending device action first"
         : null;
   }, [busy, pending.length]);
-  const analyzeLive = async (file: File, opts: { baseline: boolean }): Promise<LiveFrameResult> => {
+  const analyzeLive = async (file: File, opts: { baseline: boolean; samChanges?: string[] }): Promise<LiveFrameResult> => {
     if (liveBlocked.current) return { kind: "skipped", message: liveBlocked.current };
     if (opts.baseline) liveBase.current = null;
     const img = await prepareMedia(file);
@@ -395,7 +395,8 @@ export function AgentApp() {
       send("Live camera: this is my space right now. Use what you see to engineer my indoor air.", undefined, undefined, shared);
       return { kind: "baseline" };
     }
-    const changes = sceneChanges(prev, result.analysis);
+    // SAM 3.1 mask changes (window/smoke/stove...) plus what Muse Spark reads from the same frame.
+    const changes = [...new Set([...(opts.samChanges ?? []), ...sceneChanges(prev, result.analysis)])];
     if (changes.length === 0) return { kind: "unchanged" };
     send(liveChangeMessage(changes), undefined, undefined, shared);
     return { kind: "changed", changes };

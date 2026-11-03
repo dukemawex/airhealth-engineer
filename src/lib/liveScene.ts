@@ -67,14 +67,14 @@ export function decideLiveTick(
   s: LiveState,
   now: number,
   diff: number | null,
-  opts: { blocked?: boolean; cfg?: Partial<LiveConfig> } = {},
+  opts: { blocked?: boolean; force?: boolean; cfg?: Partial<LiveConfig> } = {},
 ): LiveDecision {
   const cfg = { ...LIVE_DEFAULTS, ...opts.cfg };
   if (s.inFlight) return { analyze: false, reason: "in_flight" };
   if (s.analyses >= cfg.maxAnalyses) return { analyze: false, reason: "budget_spent" };
   if (opts.blocked) return { analyze: false, reason: "blocked" };
   if (diff === null) return { analyze: true, reason: "baseline" };
-  if (diff < cfg.changeThreshold) return { analyze: false, reason: "unchanged" };
+  if (diff < cfg.changeThreshold && !opts.force) return { analyze: false, reason: "unchanged" };
   if (s.lastAnalysisAt !== null && now - s.lastAnalysisAt < cfg.minGapMs) return { analyze: false, reason: "cooldown" };
   return { analyze: true, reason: "scene_changed" };
 }
