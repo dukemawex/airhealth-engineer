@@ -5,7 +5,7 @@ import { useSpeakPreference } from "@/lib/client/speech";
 import { useVoiceInput } from "@/lib/client/voice";
 import type { HealthProfile } from "@/lib/domain";
 import { activeChips, composerContext, profileFromChips, toggleComposerChip } from "@/lib/healthChips";
-import { CameraSheet } from "@/components/camera/CameraSheet";
+import { CameraSheet, type LiveFrameResult } from "@/components/camera/CameraSheet";
 import { HealthChips } from "./HealthChips";
 
 function ImageIcon() {
@@ -71,12 +71,15 @@ export function Composer({
   disabledReason,
   showHealthChips = false,
   onAttach,
+  onLiveFrame,
   onCard,
 }: {
   /** Image mode: open the Muse Image "air today" card for the latest reading (absent until there is one). */
   onCard?: () => void;
   /** Photo or video chosen: the current text is passed along as the note. */
   onAttach?: (file: File, note: string) => void;
+  /** Live camera mode handler (scene re-reads that update the plan). */
+  onLiveFrame?: (file: File, opts: { baseline: boolean }) => Promise<LiveFrameResult>;
   disabled: boolean;
   busy: boolean;
   onSend: (text: string, profile?: HealthProfile) => void;
@@ -243,6 +246,7 @@ export function Composer({
                   onClose={() => setCameraOpen(false)}
                   onCapture={(f) => attachFile(f)}
                   onFallback={() => captureRef.current?.click()}
+                  onLiveFrame={onLiveFrame}
                 />
               </>
             )}

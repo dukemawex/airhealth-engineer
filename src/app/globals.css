@@ -3444,3 +3444,21 @@ dialog.camera-sheet::backdrop {
 /* WhatsApp share (user-initiated only) */
 .whatsapp-btn { display: inline-flex; align-items: center; gap: 6px; }
 .whatsapp-btn svg { color: #25d366; }
+
+/* Live camera mode */
+.live-toggle { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--color-border); background: transparent; color: inherit; font: inherit; font-size: 13px; white-space: nowrap; font-weight: 600; cursor: pointer; margin-right: 8px; align-self: flex-start; }
+.live-toggle:disabled { opacity: .5; cursor: not-allowed; }
+.live-knob { width: 26px; height: 15px; border-radius: 999px; background: rgba(148,163,184,.4); position: relative; transition: background .2s; }
+.live-knob::after { content: ""; position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%; background: #fff; transition: transform .2s; }
+.live-toggle[data-on="true"] .live-knob { background: #ef4444; }
+.live-toggle[data-on="true"] .live-knob::after { transform: translateX(11px); }
+.live-panel { position: absolute; left: 10px; right: 10px; bottom: 10px; display: grid; gap: 6px; pointer-events: none; }
+.live-status { margin: 0; justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: rgba(2,6,23,.72); color: #fff; font-size: 12px; }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; animation: live-pulse 1.4s ease-in-out infinite; }
+@keyframes live-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
+.live-events { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.live-events li { padding: 6px 10px; border-radius: 10px; background: rgba(2,6,23,.72); color: #e2e8f0; font-size: 12px; line-height: 1.35; }
+.live-events li[data-tone="change"] { background: rgba(13,148,136,.88); color: #fff; }
+.live-events li[data-tone="warn"] { background: rgba(180,83,9,.9); color: #fff; }
+.live-events time { opacity: .75; font-variant-numeric: tabular-nums; margin-right: 4px; }

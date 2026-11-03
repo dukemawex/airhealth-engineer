@@ -14,6 +14,18 @@ import {
   otherFacing,
   trackHasTorch,
 } from "@/lib/client/camera";
+import { decideLiveTick, frameDiff, initialLiveState, LIVE_DEFAULTS, lumaSignature } from "@/lib/liveScene";
+
+/** What the app did with one live frame. */
+export type LiveFrameResult =
+  | { kind: "baseline" }
+  | { kind: "changed"; changes: string[] }
+  | { kind: "unchanged" }
+  | { kind: "skipped"; message: string };
+
+type LiveEvent = { id: number; at: string; tone: "info" | "change" | "warn"; text: string };
+
+const clock = () => new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
 type Phase = "starting" | "live" | "captured" | "error";
 
@@ -43,12 +55,15 @@ export function CameraSheet({
   onClose,
   onCapture,
   onFallback,
+  onLiveFrame,
 }: {
   open: boolean;
   onClose: () => void;
   onCapture: (file: File) => void;
   /** Open the OS camera / file picker instead (shown when live capture fails). */
   onFallback: () => void;
+  /** Live mode: analyse a frame (Muse Spark + SAM) and update the plan if the scene changed. */
+  onLiveFrame?: (file: File, opts: { baseline: boolean }) => Promise<LiveFrameResult>;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -63,6 +78,22 @@ export function CameraSheet({
   const [torchOn, setTorchOn] = useState(false);
   const [shot, setShot] = useState<{ url: string; blob: Blob } | null>(null);
   const [flash, setFlash] = useState(false);
+  const [live, setLive] = useState(false);
+  const [liveNote, setLiveNote] = useState<string>("");
+  const [reads, setReads] = useState(0);
+  const [events, setEvents] = useState<LiveEvent[]>([]);
+  const liveState = useRef(initialLiveState());
+  const lastSig = useRef<Float32Array | null>(null);
+  const eventId = useRef(0);
+  const onLiveRef = useRef(onLiveFrame);
+  useEffect(() => {
+    onLiveRef.current = onLiveFrame;
+  }, [onLiveFrame]);
+  const pushEvent = useCallback((tone: LiveEvent["tone"], text: string) => {
+    eventId.current += 1;
+    const ev = { id: eventId.current, at: clock(), tone, text };
+    setEvents((e) => [ev, ...e].slice(0, 6));
+  }, []);
 
   /** Stop every track (turns the camera light off). No state updates, safe in effects. */
   const genRef = useRef(0);
@@ -147,6 +178,7 @@ export function CameraSheet({
     const onHide = () => {
       if (document.visibilityState === "hidden" && streamRef.current) {
         release();
+        setLive(false);
         setPhase("error");
         setProblem("aborted");
       }
@@ -164,9 +196,101 @@ export function CameraSheet({
 
   const close = () => {
     stop();
+    setLive(false);
+    setEvents([]);
+    setLiveNote("");
     setShot(null);
     setFacing("environment");
     onClose();
+  };
+
+  // Live mode loop: a 32x24 thumbnail diff every few seconds; a vision call only when the scene changed.
+  useEffect(() => {
+    if (!live || phase !== "live") return;
+    let cancelled = false;
+    const thumb = document.createElement("canvas");
+    thumb.width = LIVE_DEFAULTS.thumbW;
+    thumb.height = LIVE_DEFAULTS.thumbH;
+    const tctx = thumb.getContext("2d", { willReadFrequently: true });
+    const grab = (v: HTMLVideoElement) =>
+      new Promise<File | null>((resolve) => {
+        const { width, height } = captureSize(v.videoWidth, v.videoHeight);
+        const c = document.createElement("canvas");
+        c.width = width;
+        c.height = height;
+        const ctx = c.getContext("2d");
+        if (!ctx) return resolve(null);
+        ctx.drawImage(v, 0, 0, width, height);
+        c.toBlob((b) => resolve(b ? new File([b], captureFileName(new Date()), { type: "image/jpeg" }) : null), "image/jpeg", 0.85);
+      });
+    const tick = async () => {
+      const v = videoRef.current;
+      const handler = onLiveRef.current;
+      if (cancelled || !v || !v.videoWidth || !streamRef.current || !tctx || !handler) return;
+      tctx.drawImage(v, 0, 0, thumb.width, thumb.height);
+      const sig = lumaSignature(tctx.getImageData(0, 0, thumb.width, thumb.height).data, thumb.width * thumb.height);
+      const diff = lastSig.current ? frameDiff(lastSig.current, sig) : null;
+      const d = decideLiveTick(liveState.current, Date.now(), diff);
+      if (!d.analyze) {
+        if (d.reason === "budget_spent") {
+          setLive(false);
+          pushEvent("warn", `Live mode paused: ${LIVE_DEFAULTS.maxAnalyses} scene reads used. Turn it on again to continue.`);
+        } else if (d.reason === "unchanged") setLiveNote("Watching: no change in view");
+        else if (d.reason === "cooldown") setLiveNote("Change seen: waiting a few seconds before the next read");
+        return;
+      }
+      liveState.current = { ...liveState.current, inFlight: true };
+      setLiveNote(d.reason === "baseline" ? "Reading the scene…" : "Scene changed: re-reading…");
+      try {
+        const file = await grab(v);
+        if (!file || cancelled) {
+          liveState.current = { ...liveState.current, inFlight: false };
+          return;
+        }
+        const r = await handler(file, { baseline: d.reason === "baseline" });
+        if (cancelled) return;
+        if (r.kind === "skipped") {
+          // Nothing was sent: keep the old baseline so the change is picked up later.
+          liveState.current = { ...liveState.current, inFlight: false };
+          setLiveNote(r.message);
+          return;
+        }
+        liveState.current = { analyses: liveState.current.analyses + 1, lastAnalysisAt: Date.now(), inFlight: false };
+        lastSig.current = sig;
+        setReads(liveState.current.analyses);
+        if (r.kind === "baseline") pushEvent("info", "Scene read → plan started");
+        else if (r.kind === "changed") pushEvent("change", `Scene changed → plan updated: ${r.changes.join("; ")}`);
+        else pushEvent("info", "Movement seen, nothing that changes the plan");
+        setLiveNote("Watching");
+      } catch (err) {
+        if (cancelled) return;
+        liveState.current = { ...liveState.current, inFlight: false };
+        const m = err instanceof Error ? err.message : "Live read failed";
+        pushEvent("warn", m);
+        if (/limit|429/i.test(m)) setLive(false);
+      }
+    };
+    const first = setTimeout(() => void tick(), 400);
+    const id = setInterval(() => void tick(), LIVE_DEFAULTS.tickMs);
+    return () => {
+      cancelled = true;
+      clearTimeout(first);
+      clearInterval(id);
+    };
+  }, [live, phase, pushEvent]);
+
+  const toggleLive = () => {
+    if (live) {
+      setLive(false);
+      setLiveNote("");
+      return;
+    }
+    liveState.current = initialLiveState();
+    lastSig.current = null;
+    setReads(0);
+    setEvents([]);
+    setLiveNote("Starting live mode…");
+    setLive(true);
   };
 
   const flip = () => {
@@ -254,6 +378,20 @@ export function CameraSheet({
               Frame windows, vents, the purifier and any haze. Muse Spark reads the scene, SAM 3.1 outlines it, and device actions still wait for your approval.
             </p>
           </div>
+          {onLiveFrame && (
+            <button
+              type="button"
+              role="switch"
+              aria-checked={live}
+              className="live-toggle"
+              data-on={live}
+              onClick={toggleLive}
+              disabled={phase !== "live"}
+              title="Re-read the scene every few seconds, only when it changes"
+            >
+              <span className="live-knob" aria-hidden="true" /> Live
+            </button>
+          )}
           <button type="button" className="btn btn-secondary icon-btn camera-close" onClick={close} aria-label="Close camera">
             <Icon d={ICONS.close} />
           </button>
@@ -302,6 +440,22 @@ export function CameraSheet({
             </div>
           )}
           {phase === "live" && <div className="camera-frame" aria-hidden="true" />}
+          {(live || events.length > 0) && (
+            <div className="live-panel" data-testid="live-panel">
+              {live && (
+                <p className="live-status" role="status">
+                  <span className="live-dot" aria-hidden="true" /> {liveNote || "Watching"} · {reads}/{LIVE_DEFAULTS.maxAnalyses} reads
+                </p>
+              )}
+              <ol className="live-events" aria-live="polite" aria-label="Live scene events">
+                {events.map((e) => (
+                  <li key={e.id} data-tone={e.tone}>
+                    <time>{e.at}</time> {e.text}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
           {flash && <div className="camera-flash" aria-hidden="true" />}
         </div>
 
@@ -351,7 +505,12 @@ export function CameraSheet({
             </>
           )}
         </div>
-        <p className="camera-note">The camera turns off when you close this sheet. Photos are only sent when you tap Use photo.</p>
+        <p className="camera-note">
+          The camera turns off when you close this sheet or switch tabs.{" "}
+          {live
+            ? `Live mode sends a frame only when the scene changes (at most ${LIVE_DEFAULTS.maxAnalyses} reads); device actions still wait for your approval.`
+            : "Photos are only sent when you tap Use photo or turn on Live."}
+        </p>
       </div>
     </dialog>
   );

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { parseBody, route } from "@/lib/api";
 import { getConfig } from "@/lib/config";
+import { AppError } from "@/lib/errors";
+import { FixedWindowLimiter } from "@/lib/rateLimit";
 import { runVisionPipeline } from "@/lib/vision/pipeline";
 
 export const runtime = "nodejs";
@@ -16,7 +18,12 @@ const Body = z.object({
   height: z.number().int().min(16).max(4096),
   note: z.string().trim().max(500).optional(),
   place: z.string().trim().max(120).optional(),
+  /** Frame from live camera mode: rate limited as a cost guard. */
+  live: z.boolean().optional(),
 });
+
+/** Live mode: at most 15 analyses per client per 10 minutes on each instance. */
+const liveLimiter = new FixedWindowLimiter(15, 10 * 60_000);
 
 /**
  * Photo or video frame -> Muse Spark image understanding (json_schema) ->
@@ -24,6 +31,12 @@ const Body = z.object({
  */
 export const POST = route("vision.analyze", async ({ req, log }) => {
   const body = await parseBody(req, Body);
+  if (body.live) {
+    const client = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+    if (!liveLimiter.take(client)) {
+      throw new AppError("rate_limited", "Live camera limit reached (15 scene reads per 10 minutes). Pausing live mode; take a photo instead.");
+    }
+  }
   const cfg = getConfig();
   const result = await runVisionPipeline(
     { cfg: cfg.meta, logger: log },

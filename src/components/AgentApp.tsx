@@ -5,7 +5,9 @@ import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StatusReport } from "@/lib/agent/status";
 import type { HealthProfile, LocationQuery, SessionScene } from "@/lib/domain";
-import type { VisionResult } from "@/lib/vision/scene";
+import type { SceneAnalysis, VisionResult } from "@/lib/vision/scene";
+import { liveChangeMessage, sceneChanges } from "@/lib/liveScene";
+import type { LiveFrameResult } from "./camera/CameraSheet";
 import { prepareMedia } from "@/lib/client/media";
 import { SceneProgress } from "./cards/SceneCard";
 import { ApiError, apiFetch, authHeaders, conversationStore, fetchJsonLoose, tokenStore } from "@/lib/client/api";
@@ -330,6 +332,42 @@ export function AgentApp() {
       setVisionJob((j) => ({ imageUrl: j?.imageUrl, stage: "", error: err instanceof Error ? err.message : "Photo analysis failed" }));
     }
   };
+  // Live camera mode: each changed frame is read by Muse Spark + SAM; only plan-relevant changes start an agent turn.
+  const liveBase = useRef<SceneAnalysis | null>(null);
+  const liveBlocked = useRef<string | null>(null);
+  useEffect(() => {
+    liveBlocked.current = busy
+      ? "Waiting for the current reply before the next read"
+      : pending.length > 0
+        ? "Approve or reject the pending device action first"
+        : null;
+  }, [busy, pending.length]);
+  const analyzeLive = async (file: File, opts: { baseline: boolean }): Promise<LiveFrameResult> => {
+    if (liveBlocked.current) return { kind: "skipped", message: liveBlocked.current };
+    if (opts.baseline) liveBase.current = null;
+    const img = await prepareMedia(file);
+    let result: VisionResult;
+    try {
+      result = await apiFetch<VisionResult>("/api/vision", {
+        method: "POST",
+        body: JSON.stringify({ image: img.dataUrl, width: img.width, height: img.height, place: newsPlace, live: true }),
+      });
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) setAccessOpen(true);
+      throw err;
+    }
+    const prev = liveBase.current;
+    liveBase.current = result.analysis;
+    const shared = { imageUrl: img.dataUrl, result, kind: "photo" as const };
+    if (!prev) {
+      send("Live camera: this is my space right now. Use what you see to engineer my indoor air.", undefined, undefined, shared);
+      return { kind: "baseline" };
+    }
+    const changes = sceneChanges(prev, result.analysis);
+    if (changes.length === 0) return { kind: "unchanged" };
+    send(liveChangeMessage(changes), undefined, undefined, shared);
+    return { kind: "changed", changes };
+  };
   const decide = (a: ApprovalView, decision: "approve" | "reject", note?: string) => {
     setReviewing(null);
     setBanner(null);
@@ -505,6 +543,7 @@ export function AgentApp() {
               busy={busy}
               onSend={(t, profile) => send(t, undefined, profile)}
               onAttach={(f, note) => void analyzeMedia(f, note)}
+              onLiveFrame={analyzeLive}
               onCard={history.length > 0 ? openCard : undefined}
               showHealthChips={messages.length > 0}
               onStop={stop}
