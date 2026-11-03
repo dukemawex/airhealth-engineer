@@ -29,11 +29,11 @@
 
 ## 0:45–1:15 · Snap the haze → SAM 3.1 outlines it
 
-**Do:** tap **Photo · SAM 3.1**, pick or take the hazy room or window photo, and send.
+**Do:** tap **Camera**. The live sheet opens on the rear camera (switch camera and torch are there if needed). Frame the hazy window, the vent and the purifier, tap the shutter, then **Use photo**. Backup if the camera is blocked or the venue Wi-Fi is slow: tap **Photo · SAM 3.1** and upload the prepared photo.
 
 **Show:** the scene card. **SAM 3.1** masks outline the haze, the open window and the vent. Muse Spark's structured scene shows the haze level, the openings, whether a purifier is visible and the estimated floor area. The photo also lands in the gallery strip.
 
-**Say:** "Muse Spark reads the photo into a strict JSON scene, and SAM 3.1 outlines what matters. This isn't image analysis for its own sake. The scene feeds the device plan: the open window it found and the room size it estimated go straight into the engineering."
+**Say:** "That's a live frame from the room, not a stock image. Muse Spark reads it into a strict JSON scene, and SAM 3.1 outlines what matters. This isn't image analysis for its own sake. The scene feeds the device plan: the open window it found and the room size it estimated go straight into the engineering."
 
 ## 1:15–1:55 · Muse Spark reasons → plan timeline
 

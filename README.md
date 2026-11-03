@@ -33,6 +33,10 @@ Every model call goes to **Meta models only** (the Meta Model API, `https://api.
 ![Human approval gate](docs/screenshots/approval-desktop.png)
 
 <img src="docs/screenshots/conversation-mobile.png" width="320" alt="Live session on mobile" />
+
+![Live camera sheet](docs/screenshots/camera-sheet-desktop.png)
+
+<img src="docs/screenshots/camera-sheet-mobile.png" width="320" alt="Live camera sheet on mobile" />
 </details>
 
 ---
@@ -63,7 +67,7 @@ The UI explains this too (header → **How it works**).
 
 | Step | What happens | Tool / route |
 | --- | --- | --- |
-| 1. You describe | Speak (Muse Voice Transcribe, Web Speech fallback), snap a photo or short video of the room, or type a location (any city, area, postcode, or browser geolocation). An optional sensitivity profile (household, age group, sensitivities) only tunes device thresholds. | `POST /api/transcribe`, `POST /api/vision`, `POST /api/agent` |
+| 1. You describe | Speak (Muse Voice Transcribe, Web Speech fallback), snap the room live with the in-app **Camera** (rear camera, switch, torch) or upload a photo or short video, or type a location (any city, area, postcode, or browser geolocation). An optional sensitivity profile (household, age group, sensitivities) only tunes device thresholds. | `POST /api/transcribe`, `POST /api/vision`, `POST /api/agent` |
 | 1b. Photo → scene | Muse Spark returns a structured scene (haze level, openings, vents, purifier, room size estimate) and SAM 3.1 outlines each region. The scene feeds the device plan: e.g. close the open window it found, size the purifier to the room it estimated. | `POST /api/vision` |
 | 2. Muse Spark plans | The model reads the conversation and decides which tools to call. It asks only for the minimum it still needs. | Meta Model API `/chat/completions` (streamed) |
 | 3. Real data | Places are geocoded worldwide (Open-Meteo, with OpenStreetMap Nominatim for postcodes and addresses; no keys needed). Shared coordinates are reverse-geocoded to a readable place. The nearest **OpenAQ v3** stations are ranked by distance, widening from 25 km up to 100 km when nothing closer reports. If no station reports, or every nearby station is stale (some report only years-old readings), CAMS modelled data is used and labelled **Modelled**. | `getAirQuality`, `getHealthContext` |
@@ -118,6 +122,7 @@ Everything in this repo was built during the hackathon. The first commit was on 
 | 72-hour CAMS forecast plan with per-step approval (`json_schema`) | `1922a82` | 2026-11-03 06:36 |
 | Muse Image "air today" card (share sheet or download only) | `538246a` | 2026-11-03 06:38 |
 | Studio redesign: dark Canva × Higgsfield-style UI, prompt bar, gallery, sensitivity profile copy | `53ed25f` | 2026-11-03 06:48 |
+| Live in-app camera: rear camera by default, switch and torch, captured frame goes to Muse Spark vision + SAM 3.1, Permissions-Policy `camera=(self)` | `e82b052` | 2026-11-03 07:40 |
 
 The 3-minute demo script is in [docs/demo-script.md](docs/demo-script.md).
 
