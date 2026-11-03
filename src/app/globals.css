@@ -1916,3 +1916,182 @@ dialog.modal.wide {
 .btn:active:not(:disabled) {
   transform: translateY(1px);
 }
+
+/* Health-context chips and quick-start prompts */
+.speak-toggle[aria-expanded="true"] {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
+  color: var(--color-primary-strong);
+}
+.health-chips {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.chip-group {
+  display: grid;
+  gap: 6px;
+}
+.chip-group-title {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  letter-spacing: 0.02em;
+}
+.chip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 4px 12px 4px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+}
+.chip svg {
+  color: var(--color-text-muted);
+  flex: none;
+}
+.chip:hover:not(:disabled) {
+  border-color: var(--color-primary);
+}
+.chip:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.chip[aria-pressed="true"] {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
+  color: var(--color-primary-strong);
+}
+.chip[aria-pressed="true"] svg {
+  color: var(--color-primary-strong);
+}
+.chip[data-kind="symptom"][aria-pressed="true"] {
+  background: #fdf1e7;
+  border-color: #c76a2a;
+  color: #7a3a10;
+}
+.chip[data-kind="symptom"][aria-pressed="true"] svg {
+  color: #7a3a10;
+}
+.chip:focus-visible,
+.starter:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.chip:disabled,
+.starter:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.health-chips[data-compact] {
+  margin: 0;
+  grid-template-columns: minmax(0, 1fr);
+}
+.health-chips[data-compact] .chip-group {
+  display: block;
+  min-width: 0;
+}
+.health-chips[data-compact] .chip-list {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding: 2px 2px 4px;
+  scroll-snap-type: x proximity;
+}
+.health-chips[data-compact] .chip-list li {
+  flex: none;
+  scroll-snap-align: start;
+}
+.composer-chips {
+  max-width: 760px;
+  margin: 0 auto var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+.front,
+.front-head {
+  grid-template-columns: minmax(0, 1fr);
+}
+.starters {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-3);
+}
+.starter-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.starter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-primary-strong);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+}
+.starter:hover:not(:disabled) {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
+}
+.starter:active:not(:disabled) {
+  transform: scale(0.98);
+}
+@media (max-width: 640px) {
+  .starter-list {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    width: 100%;
+    min-width: 0;
+    padding-bottom: 4px;
+  }
+  .starter-list li {
+    flex: none;
+  }
+  .chip {
+    min-height: 36px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chip,
+  .starter {
+    transition: none;
+  }
+  .chip:active,
+  .starter:active {
+    transform: none;
+  }
+}

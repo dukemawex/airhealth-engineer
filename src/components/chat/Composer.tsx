@@ -2,6 +2,9 @@
 
 import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useDictation, useSpeakPreference } from "@/lib/client/speech";
+import type { HealthProfile } from "@/lib/domain";
+import { activeChips, composerContext, profileFromChips, toggleComposerChip } from "@/lib/healthChips";
+import { HealthChips } from "./HealthChips";
 
 function MicIcon() {
   return (
@@ -27,14 +30,17 @@ export function Composer({
   onSend,
   onStop,
   disabledReason,
+  showHealthChips = false,
 }: {
   disabled: boolean;
   busy: boolean;
-  onSend: (text: string) => void;
+  onSend: (text: string, profile?: HealthProfile) => void;
+  showHealthChips?: boolean;
   onStop: () => void;
   disabledReason?: string;
 }) {
   const [text, setText] = useState("");
+  const [chipsOpen, setChipsOpen] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
   const dictation = useDictation((heard) => {
     if (!heard) return;
@@ -48,8 +54,9 @@ export function Composer({
     const t = text.trim();
     if (!t || disabled) return;
     if (dictation.listening) dictation.stop();
-    onSend(t);
+    onSend(t, profileFromChips(activeChips(composerContext(t))));
     setText("");
+    setChipsOpen(false);
     ref.current?.focus();
   };
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -64,6 +71,19 @@ export function Composer({
     "Enter to send · Shift+Enter for a new line · Device actions always ask for your approval first.";
   return (
     <div className="composer" data-listening={dictation.listening}>
+      {showHealthChips && chipsOpen && (
+        <div id="composer-chips" className="composer-chips">
+          <HealthChips
+            compact
+            text={composerContext(text)}
+            disabled={disabled}
+            onToggle={(c) => {
+              setText((t) => toggleComposerChip(t, c));
+              ref.current?.focus();
+            }}
+          />
+        </div>
+      )}
       <form onSubmit={submit} aria-label="Send a message">
         <label htmlFor="composer-input" className="sr-only">
           Message AirHealth Engineer
@@ -112,6 +132,20 @@ export function Composer({
         <p id="composer-hint" className="composer-hint" data-tone={dictation.error ? "error" : undefined}>
           {hint}
         </p>
+        {showHealthChips && (
+          <button
+            type="button"
+            className="speak-toggle"
+            aria-expanded={chipsOpen}
+            aria-controls="composer-chips"
+            onClick={() => setChipsOpen((o) => !o)}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 21s-7.5-4.6-9.3-9.6C1.4 7.6 4 4 7.5 4c2 0 3.5 1.1 4.5 2.6C13 5.1 14.5 4 16.5 4 20 4 22.6 7.6 21.3 11.4 19.5 16.4 12 21 12 21Z" />
+            </svg>
+            <span>Health context</span>
+          </button>
+        )}
         {speakPref.supported && (
           <button
             type="button"

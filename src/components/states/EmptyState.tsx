@@ -1,7 +1,9 @@
 "use client";
 
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
-import type { LocationQuery } from "@/lib/domain";
+import type { HealthProfile, LocationQuery } from "@/lib/domain";
+import { activeChips, profileFromChips, STARTER_PROMPTS, toggleChipText } from "@/lib/healthChips";
+import { HealthChips } from "@/components/chat/HealthChips";
 import { ApiError } from "@/lib/client/api";
 import { GeoFailure, getCurrentFix, type Fix } from "@/lib/client/geolocation";
 import { previewPlace } from "@/lib/client/resolvePlace";
@@ -50,7 +52,7 @@ export function EmptyState({
   onStart,
 }: {
   disabled: boolean;
-  onStart: (args: { message: string; location?: LocationQuery }) => void;
+  onStart: (args: { message: string; location?: LocationQuery; profile?: HealthProfile }) => void;
 }) {
   const [fix, setFix] = useState<Fix | null>(null);
   const [fixLabel, setFixLabel] = useState<string | null>(null);
@@ -63,7 +65,7 @@ export function EmptyState({
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestText = useRef("");
 
-  const locate = async () => {
+  const locate = async (): Promise<Fix | null> => {
     setGeoState("locating");
     setGeoError(null);
     setPlace("");
@@ -80,10 +82,12 @@ export function EmptyState({
         /* Naming is best-effort; the coordinates are still used. */
       }
       setGeoState("idle");
+      return f;
     } catch (err) {
       setFix(null);
       setGeoState("error");
       setGeoError(err instanceof GeoFailure ? err.message : "Couldn't get your location. Type your city, area or postcode instead.");
+      return null;
     }
   };
 
@@ -109,20 +113,38 @@ export function EmptyState({
 
   const typed = place.trim();
   const canStart = Boolean(fix || typed) && preview.status !== "notfound";
+  const healthText = health.trim();
+  const whoSentence = healthText ? ` My health context: ${healthText}.` : "";
+  const currentLocation = (f: Fix | null = fix): LocationQuery | undefined =>
+    typed ? { city: typed } : f ? { latitude: f.latitude, longitude: f.longitude, accuracyMeters: f.accuracy } : undefined;
+  const whereSentence = (f: Fix | null = fix) =>
+    typed
+      ? `I'm in ${typed}${preview.status === "found" ? ` (${preview.label})` : ""}.`
+      : f
+        ? `I've shared my device location${fixLabel ? ` (${fixLabel})` : ""}.`
+        : "";
+
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!canStart) return;
-    const where = typed
-      ? `I'm in ${typed}${preview.status === "found" ? ` (${preview.label})` : ""}.`
-      : `I've shared my device location${fixLabel ? ` (${fixLabel})` : ""}.`;
-    const who = health.trim() ? ` My health context: ${health.trim()}.` : " I haven't shared any health details yet.";
     onStart({
-      message: `${where}${who} Please check the air quality where I am and design an intervention to protect my health.`,
-      location: typed
-        ? { city: typed }
-        : fix
-          ? { latitude: fix.latitude, longitude: fix.longitude, accuracyMeters: fix.accuracy }
-          : undefined,
+      message: `${whereSentence()}${whoSentence || " I haven't shared any health details yet."} Please check the air quality where I am and design an intervention to protect my health.`,
+      location: currentLocation(),
+      profile: profileFromChips(activeChips(health)),
+    });
+  };
+
+  const startWith = async (p: (typeof STARTER_PROMPTS)[number]) => {
+    let f = fix;
+    if (p.useLocation && !typed && !f) {
+      f = await locate();
+      if (!f) return; // the location status line explains what went wrong
+    }
+    const where = whereSentence(f);
+    onStart({
+      message: `${where ? `${where} ` : ""}${p.message}${whoSentence}`,
+      location: currentLocation(f),
+      profile: profileFromChips(activeChips(health)),
     });
   };
 
@@ -162,6 +184,28 @@ export function EmptyState({
           ventilation and exposure plan, and asks for your approval before touching any device.
         </p>
         <hr className="rule-double" />
+        <div className="starters" role="group" aria-labelledby="starters-title">
+          <span id="starters-title" className="kicker">
+            Quick start
+          </span>
+          <ul className="starter-list">
+            {STARTER_PROMPTS.map((p) => (
+              <li key={p.id}>
+                <button
+                  type="button"
+                  className="starter"
+                  onClick={() => void startWith(p)}
+                  disabled={disabled || geoState === "locating" || geoState === "naming"}
+                >
+                  {p.label}
+                  <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12h14M13 6l6 6-6 6" />
+                  </svg>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       </header>
       <div className="front-grid">
         <form className="empty-form" onSubmit={submit} aria-labelledby="start-title" aria-describedby="empty-privacy">
@@ -225,9 +269,10 @@ export function EmptyState({
               value={health}
               onChange={(e) => setHealth(e.target.value)}
               maxLength={1500}
-              placeholder="Conditions, symptoms, age group, medications or plans for today"
+              placeholder="Tap suggestions below or type anything relevant: age group, medications, plans for today"
               aria-describedby="health-hint"
             />
+            <HealthChips text={health} onToggle={(c) => setHealth((h) => toggleChipText(h, c))} disabled={disabled} />
             <span id="health-hint" className="hint">
               Used only to tailor thresholds and precautions. Not a diagnosis.
             </span>

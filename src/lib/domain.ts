@@ -75,6 +75,16 @@ export const HealthProfileSchema = z.object({
     })
     .optional(),
   activityPlans: z.string().max(500).optional().describe("e.g. 'cycling to work at 08:00'"),
+  household: z
+    .array(z.string().trim().min(1).max(120))
+    .max(10)
+    .optional()
+    .describe("Sensitive people sharing the home, e.g. child, infant, older adult, pregnant person"),
+  activities: z
+    .array(z.string().trim().min(1).max(120))
+    .max(10)
+    .optional()
+    .describe("Regular outdoor exposure, e.g. works outdoors, runs or exercises outdoors"),
 });
 export type HealthProfile = z.infer<typeof HealthProfileSchema>;
 

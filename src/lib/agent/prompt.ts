@@ -25,7 +25,20 @@ export function buildDeveloperPrompt(session: Session, now: Date, adapterName: s
     "",
     `Current UTC time: ${now.toISOString()}`,
     `Session location: ${loc}`,
-    `Health profile on file: ${session.profile ? "yes" : "no"}`,
+    `Health profile on file: ${describeProfile(session.profile)}`,
     `Device adapter: ${adapterName}${adapterName === "sandbox" ? " (simulated; tell the user no physical device is controlled)" : ""}`,
   ].join("\n");
+}
+
+/** One-line summary of the structured health context (user-shared, not a diagnosis). */
+function describeProfile(p: Session["profile"]): string {
+  if (!p) return "no";
+  const parts = [
+    p.ageGroup && `age group ${p.ageGroup}`,
+    p.conditions?.length && `conditions: ${p.conditions.join(", ")}`,
+    p.symptoms?.length && `symptoms: ${p.symptoms.join(", ")}`,
+    p.household?.length && `household: ${p.household.join(", ")}`,
+    p.activities?.length && `activities: ${p.activities.join(", ")}`,
+  ].filter(Boolean);
+  return parts.length ? `yes (${parts.join("; ")}). Call getHealthContext to assess it before designing.` : "yes";
 }

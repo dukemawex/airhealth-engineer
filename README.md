@@ -27,7 +27,7 @@ An autonomous agent that works where **engineering meets health**. You say where
 ## Contents
 
 - [How it works](#how-it-works)
-- [Location, voice, news and Bluetooth](#location-voice-news-and-bluetooth)
+- [Location, voice, news and Bluetooth](#location-voice-news-and-bluetooth) (plus health chips and quick starts)
 - [Quick start (local)](#quick-start-local)
 - [Keys and configuration](#keys-and-configuration)
 - [Deploy to Vercel](#deploy-to-vercel)
@@ -70,6 +70,12 @@ Each conversation has its own memory, stored server-side: messages, location, he
 ---
 
 ## Location, voice, news and Bluetooth
+
+**Health suggestions and quick starts**
+- Under the health field, tap-to-toggle chips cover common contexts (asthma, allergies / hay fever, COPD, heart condition, pregnant, child at home, older adult 65+, diabetes, outdoor worker, runner) and how you feel today (coughing, wheezing, shortness of breath, headache, itchy eyes). Each chip is a button with `aria-pressed`; tapping adds or removes a plain phrase in the field, and typing the phrase yourself lights the chip up too.
+- Selected chips are also sent as a structured profile (`conditions`, `symptoms`, `ageGroup`, `household`, `activities`) to `getHealthContext`, which tightens thresholds for sensitive household members and adds timing cautions for regular outdoor exposure. Chips describe context only; nothing is a diagnosis.
+- Once a briefing is running, the **Health context** button under the composer opens a compact chip row that keeps a single "My health context: …" line in your message.
+- **Quick start** prompts (check the air now with your location, plan a safer commute, set up the purifier for tonight, exercising outside) start a briefing in one tap. None names a fixed city.
 
 **Location**
 - **Use my location** checks for https and a denied permission first, then asks for a high-accuracy fix. If that times out it falls back to a coarse fix. Every failure has a plain message: denied, timeout, unavailable, insecure page or unsupported browser.

@@ -4,7 +4,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StatusReport } from "@/lib/agent/status";
-import type { LocationQuery } from "@/lib/domain";
+import type { HealthProfile, LocationQuery } from "@/lib/domain";
 import { ApiError, apiFetch, authHeaders, conversationStore, fetchJsonLoose, tokenStore } from "@/lib/client/api";
 import { getSpeakPreference, speak, stopSpeaking } from "@/lib/client/speech";
 import type { AgentUIMessage, ApprovalView } from "@/lib/ui-types";
@@ -29,7 +29,7 @@ const MONITOR_POLL_MS = 5 * 60_000;
 type SendBody =
   | { approval: { id: string; decision: "approve" | "reject"; note?: string } }
   | { resume: true }
-  | { location?: LocationQuery };
+  | { location?: LocationQuery; profile?: HealthProfile };
 
 type HealthResponse = { status?: string; checks?: { metaModelApi?: { configured?: boolean; model?: string } } };
 type MonitorResponse = { checked: boolean; notified?: boolean; reason?: string };
@@ -75,7 +75,12 @@ function createConnection() {
       const last = messages[messages.length - 1];
       const text = last?.parts.map((p) => (p.type === "text" ? p.text : "")).join("") ?? "";
       return {
-        body: { conversationId: getConversationId() ?? undefined, message: text, location: "location" in b ? b.location : undefined },
+        body: {
+          conversationId: getConversationId() ?? undefined,
+          message: text,
+          location: "location" in b ? b.location : undefined,
+          profile: "profile" in b ? b.profile : undefined,
+        },
         headers,
       };
     },
@@ -277,10 +282,10 @@ export function AgentApp() {
     if (el && stick.current) el.scrollTop = el.scrollHeight;
   }, [messages, busy]);
 
-  const send = (text: string, location?: LocationQuery) => {
+  const send = (text: string, location?: LocationQuery, profile?: HealthProfile) => {
     setBanner(null);
     stopSpeaking();
-    void sendMessage({ text }, { body: { location } satisfies SendBody });
+    void sendMessage({ text }, { body: { location, profile } satisfies SendBody });
   };
   const decide = (a: ApprovalView, decision: "approve" | "reject", note?: string) => {
     setReviewing(null);
@@ -391,7 +396,7 @@ export function AgentApp() {
                 {restoring ? (
                   <LoadingState label="Restoring your conversation" />
                 ) : messages.length === 0 ? (
-                  <EmptyState disabled={busy} onStart={({ message, location }) => send(message, location)} />
+                  <EmptyState disabled={busy} onStart={({ message, location, profile }) => send(message, location, profile)} />
                 ) : (
                   <>
                     <header className="briefing-head">
@@ -435,7 +440,8 @@ export function AgentApp() {
             <Composer
               disabled={busy || pending.length > 0 || restoring}
               busy={busy}
-              onSend={(t) => send(t)}
+              onSend={(t, profile) => send(t, undefined, profile)}
+              showHealthChips={messages.length > 0}
               onStop={stop}
               disabledReason={pending.length > 0 ? "Approve or reject the pending device action to continue." : undefined}
             />

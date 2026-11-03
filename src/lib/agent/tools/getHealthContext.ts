@@ -24,6 +24,8 @@ export function mergeProfile(current: HealthProfile | undefined, update: HealthP
     conditions: uniq([...(current.conditions ?? []), ...(update.conditions ?? [])]),
     symptoms: uniq([...(current.symptoms ?? []), ...(update.symptoms ?? [])]),
     medications: uniq([...(current.medications ?? []), ...(update.medications ?? [])]),
+    household: uniq([...(current.household ?? []), ...(update.household ?? [])]),
+    activities: uniq([...(current.activities ?? []), ...(update.activities ?? [])]),
     recentData: { ...(current.recentData ?? {}), ...(update.recentData ?? {}) },
   };
 }
@@ -39,6 +41,8 @@ export function assessHealth(profile: HealthProfile) {
   if (profile.ageGroup && ["infant", "child", "older_adult"].includes(profile.ageGroup)) {
     sensitivityReasons.push(`age group: ${profile.ageGroup}`);
   }
+  const household = (profile.household ?? []).filter((h) => /(child|kid|infant|baby|older|elder|65|pregnan)/i.test(h));
+  if (household.length) sensitivityReasons.push(`sensitive household member: ${household.join(", ")}`);
 
   const redFlags: string[] = symptoms.filter((s) => RED_FLAG_SYMPTOMS.test(s));
   if (d.spo2Percent !== undefined && d.spo2Percent < 92) redFlags.push(`SpO2 ${d.spo2Percent}% (< 92%)`);
@@ -56,6 +60,9 @@ export function assessHealth(profile: HealthProfile) {
   }
   if (d.indoorHumidityPercent !== undefined && (d.indoorHumidityPercent < 30 || d.indoorHumidityPercent > 60)) {
     cautions.push(`indoor humidity ${d.indoorHumidityPercent}% outside 30-60%`);
+  }
+  for (const a of profile.activities ?? []) {
+    cautions.push(`regular outdoor exposure (${a}): time outdoor activity for the cleanest hours and lower exertion when air is poor`);
   }
   if (d.indoorPm25 !== undefined && d.indoorPm25 > 9) cautions.push(`indoor PM2.5 ${d.indoorPm25} µg/m³ (> 9)`);
 
@@ -75,7 +82,7 @@ export function assessHealth(profile: HealthProfile) {
 export const getHealthContextTool = defineTool({
   name: "getHealthContext",
   description:
-    "Record and assess the user's health context (conditions, symptoms, age group, medications, recent vitals/indoor sensor data). Returns sensitivity, red-flag symptoms that need urgent medical care, and engineering thresholds. Call when the user shares health information or before designing an intervention.",
+    "Record and assess the user's health context (conditions, symptoms, age group, sensitive household members, outdoor activities, medications, recent vitals/indoor sensor data). Returns sensitivity, red-flag symptoms that need urgent medical care, and engineering thresholds. Call when the user shares health information or before designing an intervention.",
   schema: getHealthContextSchema,
   requiresApproval: false,
   async execute(args, ctx) {
