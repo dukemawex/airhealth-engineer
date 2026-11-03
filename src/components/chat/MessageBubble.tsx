@@ -35,12 +35,19 @@ export function MessageBubble({
     const text = message.parts.map((p) => (p.type === "text" ? p.text : "")).join("");
     return (
       <article className="msg msg-user" aria-label="You said">
+        <span className="msg-label" aria-hidden="true">
+          You
+        </span>
         <div className="bubble">{text}</div>
       </article>
     );
   }
   return (
     <article className="msg msg-assistant" aria-label="AirHealth Engineer replied">
+      <div className="byline" aria-hidden="true">
+        <strong>AirHealth desk</strong>
+        <span>· Muse Spark</span>
+      </div>
       {message.parts.map((part, i) => {
         const key = `${message.id}-${i}`;
         if (part.type === "text") {

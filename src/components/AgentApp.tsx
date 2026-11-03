@@ -11,7 +11,8 @@ import { ApprovalModal } from "./cards/ApprovalModal";
 import { Composer } from "./chat/Composer";
 import { MessageBubble } from "./chat/MessageBubble";
 import { AccessDialog } from "./layout/AccessDialog";
-import { Header } from "./layout/Header";
+import { LeftRail, type RailSection } from "./layout/LeftRail";
+import { Masthead } from "./layout/Masthead";
 import { HowItWorksDialog } from "./layout/HowItWorksDialog";
 import { StatusSidebar } from "./layout/StatusSidebar";
 import { EmptyState } from "./states/EmptyState";
@@ -100,16 +101,21 @@ export function AgentApp() {
   const [agentOnline, setAgentOnline] = useState<boolean | null>(null);
   const [agentDetail, setAgentDetail] = useState("Checking configuration");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [railSection, setRailSection] = useState<RailSection>("chat");
+  const closeSidebar = useCallback(() => {
+    setSidebarOpen(false);
+    setRailSection("chat");
+  }, []);
 
-  // Mobile drawer: Escape closes it.
+  // Drawer (tablet/phone): Escape closes it.
   useEffect(() => {
     if (!sidebarOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setSidebarOpen(false);
+      if (e.key === "Escape") closeSidebar();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [sidebarOpen]);
+  }, [sidebarOpen, closeSidebar]);
   const [howOpen, setHowOpen] = useState(false);
   const [accessOpen, setAccessOpen] = useState(false);
   const [reviewing, setReviewing] = useState<ApprovalView | null>(null);
@@ -292,7 +298,31 @@ export function AgentApp() {
     autoShown.current.clear();
   };
 
+  // Rail: Briefing focuses the composer; Status / Plans open the news sidebar
+  // (a drawer below 1180px) and move focus to that section's heading.
+  const selectRail = (s: RailSection) => {
+    if (s === "how") {
+      setHowOpen(true);
+      return;
+    }
+    setRailSection(s);
+    if (s === "chat") {
+      setSidebarOpen(false);
+      document.getElementById("composer-input")?.focus();
+      return;
+    }
+    setSidebarOpen(true);
+    const target = document.getElementById(s === "status" ? "sb-air" : "sb-interventions");
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Wait a frame so the drawer is visible before focusing inside it.
+    requestAnimationFrame(() => {
+      target?.scrollIntoView({ block: "start", behavior: reduce ? "auto" : "smooth" });
+      target?.focus({ preventScroll: true });
+    });
+  };
+
   const history = status?.airQualityHistory ?? [];
+  const placeLabel = status?.combined?.steps.find((x) => x.key === "location")?.detail;
   const monitoringOn = Boolean(status?.monitoring?.enabled && status.location);
   const lastIsUser = messages.at(-1)?.role === "user";
 
@@ -301,7 +331,7 @@ export function AgentApp() {
       <a href="#composer-input" className="skip-link">
         Skip to message box
       </a>
-      <Header
+      <Masthead
         agentOnline={agentOnline}
         agentDetail={agentDetail}
         monitoring={monitoringOn}
@@ -312,65 +342,82 @@ export function AgentApp() {
         }
         onHowItWorks={() => setHowOpen(true)}
         onNew={newConversation}
-        onToggleSidebar={() => setSidebarOpen((o) => !o)}
-        sidebarOpen={sidebarOpen}
         hasConversation={Boolean(conversationId || messages.length)}
       />
-      <div className="main">
-        <main className="chat" id="main">
-          <div
-            className="chat-scroll"
-            ref={scrollRef}
-            onScroll={(e) => {
-              const el = e.currentTarget;
-              stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
-            }}
-          >
-            <div className="chat-inner" role="log" aria-live="polite" aria-busy={busy} aria-label="Conversation">
-              {restoring ? (
-                <LoadingState label="Restoring your conversation" />
-              ) : messages.length === 0 ? (
-                <EmptyState disabled={busy} onStart={({ message, location }) => send(message, location)} />
-              ) : (
-                messages.map((m) => (
-                  <MessageBubble
-                    key={m.id}
-                    message={m}
-                    history={history}
-                    busy={busy}
-                    onReviewApproval={setReviewing}
-                    onRetry={retry}
-                  />
-                ))
-              )}
-              {chatStatus === "submitted" && <LoadingState />}
-              {banner && (
-                <div className="banner" data-tone="error" role="alert">
-                  <span>{banner}</span>
-                  {conversationId && lastIsUser && !busy && (
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={retry}>
-                      Retry
-                    </button>
-                  )}
-                </div>
-              )}
+      <div className="workspace">
+        <LeftRail active={howOpen ? "how" : railSection} onSelect={selectRail} pendingCount={pending.length} />
+        <div className="main">
+          <main className="chat" id="main">
+            <div
+              className="chat-scroll"
+              ref={scrollRef}
+              onScroll={(e) => {
+                const el = e.currentTarget;
+                stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+              }}
+            >
+              <div className="chat-inner" role="log" aria-live="polite" aria-busy={busy} aria-label="Conversation">
+                {restoring ? (
+                  <LoadingState label="Restoring your conversation" />
+                ) : messages.length === 0 ? (
+                  <EmptyState disabled={busy} onStart={({ message, location }) => send(message, location)} />
+                ) : (
+                  <>
+                    <header className="briefing-head">
+                      <span className="kicker">
+                        Live briefing
+                        {placeLabel && (
+                          <>
+                            <span className="sep" aria-hidden="true" />
+                            {placeLabel}
+                          </>
+                        )}
+                      </span>
+                      <h1>{status?.combined?.headline ?? "Your air-health briefing"}</h1>
+                      <hr className="rule-double" />
+                    </header>
+                    {messages.map((m) => (
+                      <MessageBubble
+                        key={m.id}
+                        message={m}
+                        history={history}
+                        busy={busy}
+                        onReviewApproval={setReviewing}
+                        onRetry={retry}
+                      />
+                    ))}
+                  </>
+                )}
+                {chatStatus === "submitted" && <LoadingState />}
+                {banner && (
+                  <div className="banner" data-tone="error" role="alert">
+                    <span>{banner}</span>
+                    {conversationId && lastIsUser && !busy && (
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={retry}>
+                        Retry
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-          <Composer
-            disabled={busy || pending.length > 0 || restoring}
-            busy={busy}
-            onSend={(t) => send(t)}
-            onStop={stop}
-            disabledReason={pending.length > 0 ? "Approve or reject the pending device action to continue." : undefined}
-          />
-        </main>
-        <div className="backdrop" data-open={sidebarOpen} onClick={() => setSidebarOpen(false)} aria-hidden="true" />
+            <Composer
+              disabled={busy || pending.length > 0 || restoring}
+              busy={busy}
+              onSend={(t) => send(t)}
+              onStop={stop}
+              disabledReason={pending.length > 0 ? "Approve or reject the pending device action to continue." : undefined}
+            />
+          </main>
+        </div>
+        <div className="backdrop" data-open={sidebarOpen} onClick={closeSidebar} aria-hidden="true" />
         <StatusSidebar
           status={status}
           loading={statusLoading}
           error={statusError}
           open={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
+          monitoring={monitoringOn}
+          onClose={closeSidebar}
           onRecheck={recheck}
           rechecking={rechecking}
         />

@@ -40,7 +40,8 @@ export function ApprovalModal({
         <div className="modal-body">
           <div className="modal-header">
             <div>
-              <h2 id="approval-title" className="card-title" style={{ fontSize: "var(--text-lg)" }}>
+              <span className="kicker">Human approval gate</span>
+              <h2 id="approval-title" className="card-title">
                 <ShieldIcon /> Approve device action?
               </h2>
               <p id="approval-desc" className="card-sub">

@@ -19,9 +19,12 @@ export function AccessDialog({ open, onSave, onClose }: { open: boolean; onSave:
   return (
     <dialog ref={ref} className="modal" aria-labelledby="access-title" onClose={onClose}>
       <form className="modal-body" onSubmit={submit}>
-        <h2 id="access-title" style={{ fontSize: "var(--text-lg)" }}>
-          Access token required
-        </h2>
+        <div className="modal-header">
+          <div>
+            <span className="kicker">Protected deployment</span>
+            <h2 id="access-title">Access token required</h2>
+          </div>
+        </div>
         <p className="card-sub">This deployment is protected. Paste the access token from its owner; it stays in this browser only.</p>
         <div className="field">
           <label htmlFor="access-token">Access token</label>

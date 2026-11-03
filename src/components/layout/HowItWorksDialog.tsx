@@ -14,9 +14,10 @@ export function HowItWorksDialog({ open, onClose }: { open: boolean; onClose: ()
     <dialog ref={ref} className="modal wide" aria-labelledby="how-title" onClose={onClose}>
       <div className="modal-body">
         <div className="modal-header">
-          <h2 id="how-title" style={{ fontSize: "var(--text-xl)" }}>
-            How it works
-          </h2>
+          <div>
+            <span className="kicker">The method</span>
+            <h2 id="how-title">How it works</h2>
+          </div>
           <button type="button" className="btn btn-ghost icon-btn" onClick={onClose} aria-label="Close">
             ✕
           </button>

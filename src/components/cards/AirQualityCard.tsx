@@ -23,23 +23,11 @@ export function AirQualityCard({
     <section className="card" aria-label={`Air quality${place ? ` for ${place}` : ""}`}>
       <div className="card-header">
         <div>
-          <div className="card-title">Air quality</div>
-          <div className="card-sub">{place || `${snapshot.location.latitude.toFixed(3)}, ${snapshot.location.longitude.toFixed(3)}`}</div>
-        </div>
-        <span className="badge" data-tone={measured ? "info" : "watch"}>
-          {measured ? "Measured · OpenAQ" : "Modelled · CAMS"}
-        </span>
-      </div>
-      <div className="metric-row">
-        <div className="aqi">
-          <span className="aqi-value">{aqi ?? "—"}</span>
-          <span className="aqi-label">US AQI (from PM2.5)</span>
-        </div>
-        <div className="aqi">
-          <span className="aqi-value" style={{ fontSize: "var(--text-xl)" }}>
-            {fmtNum(pm25)}
+          <span className="kicker">
+            Air now<span className="sep" aria-hidden="true" />
+            {measured ? "Measured · OpenAQ" : "Modelled · CAMS"}
           </span>
-          <span className="aqi-label">PM2.5 µg/m³</span>
+          <h3 className="card-title">{place || `${snapshot.location.latitude.toFixed(3)}, ${snapshot.location.longitude.toFixed(3)}`}</h3>
         </div>
         {cat ? (
           <span className="badge" data-tone={categoryTone(cat)}>
@@ -48,6 +36,18 @@ export function AirQualityCard({
         ) : (
           <span className="badge">No PM2.5 reading</span>
         )}
+      </div>
+      <div className="metric-row">
+        <div className="aqi">
+          <span className="aqi-value">{aqi ?? "—"}</span>
+          <span className="aqi-label">US AQI (from PM2.5)</span>
+        </div>
+        <div className="aqi">
+          <span className="aqi-value secondary">
+            {fmtNum(pm25)}
+          </span>
+          <span className="aqi-label">PM2.5 µg/m³</span>
+        </div>
         {!compact && <Sparkline points={history} label={`PM2.5 trend from ${history.length} readings`} />}
       </div>
       {!compact && snapshot.readings.length > 0 && (

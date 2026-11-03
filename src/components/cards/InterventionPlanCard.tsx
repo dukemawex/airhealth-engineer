@@ -23,8 +23,9 @@ export function InterventionPlanCard({
     <section className="card" aria-label={`Intervention plan: ${design.title ?? "untitled"}`}>
       <div className="card-header">
         <div>
-          <div className="card-title">{design.title ?? "Intervention plan"}</div>
-          {design.objective && <div className="card-sub">{design.objective}</div>}
+          <span className="kicker">Intervention plan</span>
+          <h3 className="card-title">{design.title ?? "Intervention plan"}</h3>
+          {design.objective && <p className="card-standfirst">{design.objective}</p>}
         </div>
         {status && (
           <span className="badge" data-tone={status === "active" ? "ok" : "info"}>

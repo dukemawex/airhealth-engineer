@@ -43,7 +43,8 @@ function Pending({ name }: { name: string }) {
 function ErrorCard({ name, message }: { name: string; message: string }) {
   return (
     <section className="card" data-tone="error" aria-label={`${name} failed`}>
-      <div className="card-title">{humanize(TOOL_LABEL[name] ?? name)}: not available</div>
+      <span className="kicker">Not available</span>
+      <h3 className="card-title">{humanize(TOOL_LABEL[name] ?? name)}</h3>
       <p style={{ fontSize: "var(--text-sm)" }}>{message}</p>
     </section>
   );
@@ -85,7 +86,10 @@ export function ToolResultCard({ part, history }: { part: ToolPartView; history?
       return (
         <section className="card" data-tone={executed ? "success" : undefined} aria-label="Device action result">
           <div className="card-header">
-            <div className="card-title">Device action</div>
+            <div>
+              <span className="kicker">Device action</span>
+              <h3 className="card-title">{executed ? "Carried out" : humanize(status || "Update")}</h3>
+            </div>
             <span className="badge" data-tone={executed ? "ok" : status === "rejected" ? undefined : "act"}>
               {humanize(status || "unknown")}
             </span>

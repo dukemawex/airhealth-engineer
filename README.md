@@ -223,7 +223,7 @@ src/
     api/**/route.ts                 routes listed above
   components/
     AgentApp.tsx                    useChat + custom transport (message / resume / approval), polling, restore
-    layout/  Header, StatusSidebar (journey + live status), HowItWorksDialog, AccessDialog
+    layout/  Masthead, LeftRail, StatusSidebar (news-style status desk), HowItWorksDialog, AccessDialog
     cards/   ToolResultCard, AirQualityCard (+ Sparkline), InterventionPlanCard, HealthContextSummary,
              ApprovalRequestCard, ApprovalModal
     chat/    MessageBubble, Composer
@@ -248,30 +248,55 @@ src/
 
 ## Design system
 
+The interface reads like a **live news briefing** set inside a **design-editor workspace**. The editorial side gives you serif headlines, a masthead, hairline rules, kickers and "live" badges. The editor side gives you a rounded left rail, a white canvas, tile grids and a floating composer. Both are built from scratch; no third-party logos, names or assets are used.
+
+- **Layout:**
+  - **Masthead.** A dateline strip shows today's date, a one-line note and the live badges ("Agent online", "Live · Monitoring"). Below it sit the wordmark (the SVG logo plus a serif "AirHealth *Engineer*") and pill actions.
+  - **Left rail.** Briefing, Status, Plans (interventions) and Guide (how it works). The pending-approval count shows on Plans.
+  - **Canvas.** A white, soft-shadowed card holding the conversation.
+    - Empty state: an editorial front page with a display headline, a standfirst, a double rule, a "Start your briefing" form and "In this briefing" tiles.
+    - Once a briefing starts, the masthead headline follows the agent's current verdict.
+  - **News sidebar ("The status desk").** Four ruled sections:
+    - Air now
+    - Your health context
+    - Interventions
+    - Engineering status
 - **Tokens:** CSS variables in [`src/app/globals.css`](src/app/globals.css) cover colour, space, radius, type scale, shadow and motion.
-  - Palette: deep teal (`--color-primary #0b6477`, header `#084b59`) and soft blue-green surfaces.
+  - Palette: deep teal (`--color-primary #0b6477`, ink `#0c2a31`) on soft blue-green surfaces.
+  - Restrained gradients:
+    - `--gradient-brand` (`#0a5868 → #0f7f86 → #13788f`) for primary pills, the active rail item and the masthead rule. White text stays ≥ 4.7:1 at every stop.
+    - `--gradient-soft` for your own messages.
   - Approval accent: blue-teal `#0b5f7f`.
   - Status: `ok` teal, `watch` amber, `act` orange. **Red only for true warnings** (hazardous air, errors).
-  - Text and UI colours meet WCAG AA contrast.
-- **Type:** Inter via `next/font/google`.
+  - Radii: 12, 18 and 24 px plus pills. Three shadow levels, including a `float` shadow for the composer toolbar.
+- **Type:** both via `next/font/google`.
+  - **Newsreader** (serif, optical sizes and italics) for the wordmark, headlines, section heads, card titles, readings and the agent's prose.
+  - **Inter** for UI, labels and data.
+- **Editorial primitives:** `.kicker` (uppercase label with a hairline separator), `.dateline`, `.rule` and `.rule-double`, `.standfirst`, and `.live` badges with a pulsing dot.
 - **Components:**
-  - Header with "Agent online" and "Monitoring" pulse indicators
+  - Masthead and LeftRail
   - ToolResultCard
   - AirQualityCard, with a sparkline of real readings that appears after the second reading
   - InterventionPlanCard
   - HealthContextSummary
   - ApprovalRequestCard and ApprovalModal (native `<dialog>`, focus-trapped, Esc to close)
-  - StatusSidebar journey
+  - StatusSidebar
   - Empty, loading, error and success states
-  - SVG logo
+  - SVG logo, from a single source (see [Logo](#logo))
+- **No demo data:** the sidebar shows plain placeholder text until a real reading, health context or plan exists. The tiles explain the method; they never show sample numbers.
 - **Accessibility:**
-  - Landmarks: `header`, `main`, `aside`, `nav`.
+  - Landmarks: `header`, `nav` (the rail), `main`, `aside`.
   - A skip link.
   - The chat log is `role="log"` with `aria-live="polite"`, and the status hero is a live region too.
+  - Rail buttons use `aria-current`, and Status and Plans move focus to the matching sidebar section.
   - Every icon button has a label.
-  - Visible focus rings.
-  - `prefers-reduced-motion` disables the pulses and animations.
-- **Mobile:** below 960 px the status panel becomes a drawer, with a backdrop and Esc to close.
+  - Visible focus rings, and text and UI colours meet WCAG AA contrast.
+  - `prefers-reduced-motion` disables the pulses, transitions and smooth scrolling.
+- **Responsive:**
+  - **Above 1180 px:** three columns: rail, canvas, sidebar.
+  - **1180 px and below:** the sidebar becomes a drawer, with a backdrop and Esc to close.
+  - **760 px and below:** the rail becomes a bottom tab bar and the canvas runs edge to edge.
+  - **440 px and below:** button labels and badge text shorten.
 
 ---
 

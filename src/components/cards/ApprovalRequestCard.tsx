@@ -26,9 +26,12 @@ export function ApprovalRequestCard({
   return (
     <section className="card" data-tone={pending ? "approval" : undefined} aria-label="Device action approval">
       <div className="card-header">
-        <div className="card-title">
-          <ShieldIcon />
-          {pending ? "Approval needed" : "Device action decision"}
+        <div>
+          <span className="kicker">{pending ? "Awaiting your approval" : "Device action"}</span>
+          <h3 className="card-title">
+            <ShieldIcon />
+            {pending ? "Approval needed" : "Decision recorded"}
+          </h3>
         </div>
         <span className="badge" data-tone={TONE[approval.status]}>
           {humanize(approval.status)}

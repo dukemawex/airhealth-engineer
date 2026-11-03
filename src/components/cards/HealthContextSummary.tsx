@@ -18,7 +18,12 @@ export function HealthContextSummary({
   return (
     <section className="card" data-tone={assessment?.urgentCareAdvised ? "danger" : undefined} aria-label="Health context">
       <div className="card-header">
-        <div className="card-title">Health context</div>
+        <div>
+          <span className="kicker">Your health context</span>
+          <h3 className="card-title">
+            {assessment?.urgentCareAdvised ? "Red flags reported" : assessment?.sensitiveGroup ? "Extra protection advised" : "What you shared"}
+          </h3>
+        </div>
         {assessment && (
           <span className="badge" data-tone={assessment.urgentCareAdvised ? "danger" : assessment.sensitiveGroup ? "watch" : "ok"}>
             {assessment.urgentCareAdvised ? "Seek urgent care" : assessment.sensitiveGroup ? "Sensitive group" : "General population"}
