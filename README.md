@@ -39,6 +39,25 @@ Every model call goes to **Meta models only** (the Meta Model API, `https://api.
 <img src="docs/screenshots/camera-sheet-mobile.png" width="320" alt="Live camera sheet on mobile" />
 </details>
 
+<details><summary>Air twin, live camera mode and smart plug</summary>
+
+The indoor plan card with the air twin: a modelled before/after PM2.5 curve and the time to reach the target. The screenshot uses a scripted session (real `designIntervention` output for Ikeja; the model reply was stubbed). Nothing is seeded in the app.
+
+![Indoor plan card with the air twin chart](docs/screenshots/plan-card-desktop.png)
+
+<img src="docs/screenshots/plan-card-mobile.png" width="320" alt="Plan card with air twin on mobile" />
+
+![Air twin in the conversation](docs/screenshots/plan-air-twin-desktop.png)
+
+Live camera mode: the scene is read again only when the frame changes (synthetic test feed shown).
+
+![Live camera mode](docs/screenshots/live-camera-desktop.png)
+
+Devices → Smart plug, with no plug connected (purifier power stays in the sandbox):
+
+<img src="docs/screenshots/devices-smart-plug-desktop.png" width="320" alt="Smart plug panel, no plug connected" />
+</details>
+
 ---
 
 ## Contents
@@ -75,7 +94,7 @@ The UI explains this too (header → **How it works**).
 | 3b. 72-hour plan | The CAMS hourly forecast for your coordinates goes to Muse Spark with a strict `json_schema`; it returns a timeline of device steps (purifier speed, windows, HVAC) for the worst hours. Each step has its own Approve button. Rules-based plan if the planner is unavailable. | `planForecast` |
 | 4. Engineered plan | Room volume → required clean-air delivery rate (CADR, m³/h and CFM) for the target air changes per hour, filter class, ventilation schedule, exposure guidance, and the device commands that would carry it out. | `designIntervention` |
 | 5. Approval gate | Every device command pauses the run. The pending action is persisted, and nothing runs until you **Approve** or **Reject**. Approvals expire (`APPROVAL_TTL_MINUTES`). | `executeDeviceAction`, `/api/approvals/:id/*` |
-| 6. Execute or simulate | Approved commands run through the configured adapter. **Sandbox** (the default) simulates and records state. Home Assistant and a signed webhook are the real adapters. | device adapters |
+| 6. Execute or simulate | Approved commands run through the configured adapter. **Sandbox** (the default) simulates and records state. Home Assistant and a signed webhook are the real adapters. A **smart plug** (Shelly or a Home Assistant switch) handles purifier on/off when one is connected. | device adapters, smart plug |
 | 7. Keep monitoring | The client re-checks every 5 min while the tab is visible. Vercel Cron re-checks in the background. A manual **Re-check now** button is available. Muse Spark compares the new reading with your thresholds and decides whether it's worth interrupting you. If it is, a **Monitoring update** appears in the chat. | `POST /api/sessions/:id/monitor`, `GET /api/cron/monitor` |
 
 A combined status (air × health × interventions → `ok | watch | act | unknown`) and the journey are always visible in the status panel. On mobile, the panel opens as a drawer. Everything there comes from `getStatus` / session state, and nothing in it is seeded.
@@ -124,6 +143,11 @@ Everything in this repo was built during the hackathon. The first commit was on 
 | Muse Image "air today" card (share sheet or download only) | `538246a` | 2026-11-03 06:38 |
 | Studio redesign: dark Canva × Higgsfield-style UI, prompt bar, gallery, sensitivity profile copy | `53ed25f` | 2026-11-03 06:48 |
 | Live in-app camera: rear camera by default, switch and torch, captured frame goes to Muse Spark vision + SAM 3.1, Permissions-Policy `camera=(self)` | `e82b052` | 2026-11-03 07:40 |
+| Exposure step wording, open-space plans without indoor sizing, ask for the sensitivity profile once | `af46a4f` | 2026-11-03 08:05 |
+| Air twin: modelled before/after PM2.5 curve with time-to-target on indoor plan cards | `927770c` | 2026-11-03 08:12 |
+| WhatsApp share on the air card: prefilled `wa.me` text plus the native share sheet with the card image | `8b817c2` | 2026-11-03 08:13 |
+| Live camera mode: frame-diff change detection, scene re-read only on change, plan updates, cost guard | `fc6f193` | 2026-11-03 08:20 |
+| Smart plug control: Shelly local RPC, Shelly Cloud and Home Assistant switch behind the approval gate, no-plug sandbox state | `7bd9bf7` | 2026-11-03 08:26 |
 
 The 3-minute demo script is in [docs/demo-script.md](docs/demo-script.md).
 

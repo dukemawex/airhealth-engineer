@@ -68,8 +68,12 @@ export function AirTwinChart({ twin, width = 320, height = 150 }: { twin: AirTwi
         )}
       </svg>
       <div className="air-twin-legend" aria-hidden="true">
-        <span className="swatch asis" /> As-is (no purifier, normal airing)
-        <span className="swatch plan" /> With the plan
+        <span className="air-twin-key">
+          <span className="swatch asis" /> As-is (no purifier, normal airing)
+        </span>
+        <span className="air-twin-key">
+          <span className="swatch plan" /> With the plan
+        </span>
       </div>
       <details className="air-twin-assumptions">
         <summary>Assumptions</summary>
