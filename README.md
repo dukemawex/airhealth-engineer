@@ -47,6 +47,7 @@ Every model call goes to **Meta models only** (the Meta Model API, `https://api.
 - [Meta models used](#meta-models-used)
 - [Built during the hackathon](#built-during-the-hackathon)
 - [Location, voice, news and Bluetooth](#location-voice-news-and-bluetooth) (plus sensitivity chips and quick starts)
+- [Smart plug setup](#smart-plug-setup)
 - [Quick start (local)](#quick-start-local)
 - [Keys and configuration](#keys-and-configuration)
 - [Deploy to Vercel](#deploy-to-vercel)
@@ -157,6 +158,30 @@ The 3-minute demo script is in [docs/demo-script.md](docs/demo-script.md).
 - If the device has a writable characteristic (for example a Nordic UART bridge), you can pick it as a target. After you **approve** a device action, and only then, the browser writes `{"type":"airhealth.command","approvalId":…,"command":…}` plus a newline in 20-byte packets. The approval dialog tells you when this will happen.
 - Most air conditioners, purifiers and fans use infrared remotes or vendor Wi-Fi clouds, which a web page can't reach. Use a BLE bridge (for example an ESP32 with an IR blaster) or the Home Assistant adapter. The server-side sandbox, Home Assistant and webhook adapters are unchanged.
 
+## Smart plug setup
+
+Most purifiers can't be reached from a web app, but almost any purifier can be switched by a smart plug. Plug the purifier into a Shelly plug (or any plug Home Assistant exposes as a `switch.*`), set the purifier's own switch to on, and AirHealth Engineer turns it on and off for you.
+
+- **Approval first, always.** A plug is only switched when you approve a purifier action in the chat. Saving settings and **Check connection** never switch anything (the check only reads the plug state).
+- **Power only.** `turn_on` and `turn_off` switch the plug. `set_fan_speed` to 0% turns it off; any other speed or a mode turns it on, and the result says plainly that speed and mode have to be set on the purifier. Windows and HVAC still go to `DEVICE_ADAPTER`.
+- **No faked success.** If the plug is offline, unreachable or returns an error, the approval is marked **failed** with the reason, and no device state is recorded.
+- **No plug connected.** With nothing configured, the Devices panel says so and purifier actions run in the sandbox ("SANDBOX: simulated … No smart plug connected").
+
+**Option 1: in the app (per conversation).** Open **Devices → Smart plug → Connect a plug**, pick a provider and save. Settings are stored server-side with the conversation; the cloud key is never sent back to the browser. Local hosts must be private LAN addresses (`10.x`, `172.16–31.x`, `192.168.x`, `*.local`), and cloud servers must be `shelly-<n>-<region>.shelly.cloud`.
+
+**Option 2: environment variables (server-wide default).**
+
+| Provider | Set | Call made after approval |
+| --- | --- | --- |
+| Shelly Cloud (works from Vercel) | `PLUG_PROVIDER=shelly_cloud`, `SHELLY_CLOUD_SERVER`, `SHELLY_CLOUD_AUTH_KEY`, `SHELLY_CLOUD_DEVICE_ID`, optional `SHELLY_CLOUD_CHANNEL` | `POST https://<server>/v2/devices/api/set/switch?auth_key=…` with `{"id","channel","on"}` |
+| Shelly local RPC (Gen2/Gen3) | `PLUG_PROVIDER=shelly_local`, `SHELLY_HOST`, optional `SHELLY_SWITCH_ID` | `GET http://<ip>/rpc/Switch.Set?id=0&on=true` |
+| Home Assistant | `PLUG_PROVIDER=homeassistant`, `PLUG_HA_ENTITY=switch.…`, `HOME_ASSISTANT_URL`, `HOME_ASSISTANT_TOKEN` | `POST /api/services/switch/turn_on` with `{"entity_id"}` |
+
+Where to find the values:
+- **Shelly Cloud:** in the Shelly app, *User settings → Authorization cloud key* shows the server (`shelly-XX-eu.shelly.cloud`) and the key. The Device Id is under *Device → Settings → Device information*. Shelly allows about one request per second.
+- **Shelly local:** the plug's IP from your router or the Shelly app. Local RPC only works when this app runs on the **same network** (for example `npm run build && npm start` at home). A cloud deployment such as Vercel can't reach `192.168.x.x`, and an https page can't call an http device, so use Shelly Cloud for the hosted app.
+- **Home Assistant:** a long-lived access token from your HA profile, and the plug's `switch.*` entity id. HA must be reachable from wherever this app runs (Nabu Casa or your own https URL for Vercel).
+
 ---
 
 ## Quick start (local)
@@ -207,6 +232,10 @@ Everything is in [`.env.example`](.env.example). The important keys:
 | `DEVICE_ADAPTER` | no | `sandbox` (default), `homeassistant`, or `webhook` |
 | `HOME_ASSISTANT_URL`, `HOME_ASSISTANT_TOKEN` | for HA | A long-lived access token. `deviceId` must be the HA `entity_id`. |
 | `DEVICE_WEBHOOK_URL`, `DEVICE_WEBHOOK_SECRET` | for webhook | The body is HMAC-SHA256 signed in `X-AirHealth-Signature` |
+| `PLUG_PROVIDER` | no | `shelly_local`, `shelly_cloud` or `homeassistant`. Empty means no plug: purifier power stays in the sandbox. See [Smart plug setup](#smart-plug-setup). |
+| `SHELLY_HOST`, `SHELLY_SWITCH_ID` | for `shelly_local` | The plug's LAN address (and switch channel, default 0) |
+| `SHELLY_CLOUD_SERVER`, `SHELLY_CLOUD_AUTH_KEY`, `SHELLY_CLOUD_DEVICE_ID`, `SHELLY_CLOUD_CHANNEL` | for `shelly_cloud` | From the Shelly app. The key is a secret: it is never logged or returned. |
+| `PLUG_HA_ENTITY` | for `homeassistant` | A `switch.*` entity; uses `HOME_ASSISTANT_URL` and `HOME_ASSISTANT_TOKEN` |
 | `NEXT_PUBLIC_SITE_URL` | no | Absolute URL for Open Graph links. On Vercel, `VERCEL_PROJECT_PRODUCTION_URL` is used automatically. |
 | `LOG_LEVEL` | no | `debug`/`info`/`warn`/`error`. Logs are structured JSON lines with request ids. |
 
@@ -290,6 +319,9 @@ Every response has an `x-request-id` header. If `API_AUTH_TOKEN` is set, send `A
 | GET | `/api/approvals/:id` | none | One approval |
 | POST | `/api/approvals/:id/approve` | `{ decidedBy?, note? }`, `?stream=ui` optional | `{ approval, run }` (410 if expired, 409 if already decided), or a stream |
 | POST | `/api/approvals/:id/reject` | `{ reason?, decidedBy? }`, `?stream=ui` optional | Same as approve |
+| GET | `/api/plug` | none | Server-wide smart plug status: `{ connected, source, provider, label, baseAdapter, homeAssistantAvailable }` (never the key) |
+| GET / PUT / DELETE | `/api/sessions/:id/plug` | PUT: `{ provider: "shelly_local", host, switchId? }` \| `{ provider: "shelly_cloud", server, deviceId, channel?, authKey }` \| `{ provider: "homeassistant", entityId }` | Plug status for the conversation. Saving or removing never switches the plug. |
+| POST | `/api/sessions/:id/plug` | `{ check: true }` | Read-only connection check: `{ reachable, online, on, message }` |
 | GET | `/api/geocode` | `?q=…&countryCode=…` or `?lat=…&lon=…&accuracy=…` | `{ location, label }`: the resolved place, used for the live preview. 404 `not_found` with a hint if nothing matches. |
 | GET | `/api/news` | `?place=…` (optional) | `{ place, fetchedAt, sections: [{ id, title, items: [{ title, url, source, publishedAt }], note? }] }` |
 | GET | `/api/interventions/:id` | none | One intervention plan |

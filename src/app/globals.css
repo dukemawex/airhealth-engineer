@@ -3462,3 +3462,44 @@ dialog.camera-sheet::backdrop {
 .live-events li[data-tone="change"] { background: rgba(13,148,136,.88); color: #fff; }
 .live-events li[data-tone="warn"] { background: rgba(180,83,9,.9); color: #fff; }
 .live-events time { opacity: .75; font-variant-numeric: tabular-nums; margin-right: 4px; }
+
+/* Smart plug */
+.plug-panel {
+  margin-bottom: var(--space-3);
+}
+.plug-dot-off {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--color-text-muted);
+  opacity: 0.7;
+}
+.plug-badge {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 2px var(--space-2);
+  border-radius: 999px;
+  background: var(--color-surface-3);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.plug-panel[data-connected="true"] .plug-badge {
+  color: var(--color-ok);
+  border-color: var(--color-ok);
+  background: var(--color-ok-soft);
+}
+.plug-form {
+  display: grid;
+  gap: var(--space-2);
+}
+.plug-note {
+  font-size: var(--text-sm);
+  margin: 0;
+}
+.plug-note[data-tone="error"] {
+  color: var(--color-danger);
+}
+.plug-note[data-tone="ok"] {
+  color: var(--color-ok);
+}

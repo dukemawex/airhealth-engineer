@@ -11,7 +11,7 @@ import type { DeviceAdapter, DeviceExecutionContext } from "./types";
  *   Authorization: Bearer {HOME_ASSISTANT_TOKEN}   (a long-lived access token)
  * Docs: https://developers.home-assistant.io/docs/api/rest/
  *
- * deviceId must be the Home Assistant entity_id (climate.*, fan.*, cover.*, number.*).
+ * deviceId must be the Home Assistant entity_id (climate.*, fan.*, switch.*, cover.*, number.*).
  */
 export function toHomeAssistantCall(cmd: DeviceCommand): { domain: string; service: string; data: Record<string, unknown> } {
   const entity_id = cmd.deviceId;
@@ -30,6 +30,13 @@ export function toHomeAssistantCall(cmd: DeviceCommand): { domain: string; servi
       }
       break;
     case "air_purifier":
+      if (entity_id.startsWith("switch.")) {
+        // Purifier on a smart plug exposed as a switch entity: power only.
+        if (cmd.action === "turn_on" || cmd.action === "turn_off") {
+          return { domain: "switch", service: cmd.action, data: { entity_id } };
+        }
+        throw new Error(`${entity_id} is a switch (smart plug): it can only turn the purifier on or off, not ${cmd.action}.`);
+      }
       switch (cmd.action) {
         case "turn_on":
           return { domain: "fan", service: "turn_on", data: { entity_id } };

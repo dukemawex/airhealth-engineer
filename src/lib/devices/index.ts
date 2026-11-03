@@ -3,13 +3,24 @@ import { AppError } from "../errors";
 import type { FetchLike } from "../http";
 import type { StateStore } from "../storage";
 import { HomeAssistantDeviceAdapter } from "./homeassistant";
+import { PlugAwareAdapter, plugFromEnv } from "./plug";
 import { SandboxDeviceAdapter } from "./sandbox";
 import type { DeviceAdapter } from "./types";
 import { WebhookDeviceAdapter } from "./webhook";
 
 export type { DeviceAdapter, DeviceExecutionContext } from "./types";
+export { PlugSettingsSchema, describePlug, plugFromEnv, checkPlug, type PlugSettings } from "./plug";
 
 export function createDeviceAdapter(
+  cfg: AppConfig["devices"],
+  deps: { store: StateStore; fetchImpl: FetchLike; timeoutMs: number },
+): DeviceAdapter {
+  const base = createBaseAdapter(cfg, deps);
+  const ha = cfg.homeAssistantUrl && cfg.homeAssistantToken ? { url: cfg.homeAssistantUrl, token: cfg.homeAssistantToken } : undefined;
+  return new PlugAwareAdapter(base, { ...deps, ha, envPlug: plugFromEnv(cfg.plug) });
+}
+
+function createBaseAdapter(
   cfg: AppConfig["devices"],
   deps: { store: StateStore; fetchImpl: FetchLike; timeoutMs: number },
 ): DeviceAdapter {

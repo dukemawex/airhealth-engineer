@@ -1,3 +1,4 @@
+import type { EnvPlugConfig } from "./devices/plug";
 import { z } from "zod";
 
 /**
@@ -69,6 +70,15 @@ const EnvSchema = z.object({
   HOME_ASSISTANT_TOKEN: optionalString,
   DEVICE_WEBHOOK_URL: optionalUrl,
   DEVICE_WEBHOOK_SECRET: optionalString,
+  // Smart plug (switches a purifier's power). Works on top of any DEVICE_ADAPTER.
+  PLUG_PROVIDER: z.preprocess(emptyToUndefined, z.enum(["shelly_local", "shelly_cloud", "homeassistant"]).optional()),
+  SHELLY_HOST: optionalString,
+  SHELLY_SWITCH_ID: intFromEnv(0, 0, 7),
+  SHELLY_CLOUD_SERVER: optionalString,
+  SHELLY_CLOUD_AUTH_KEY: optionalString,
+  SHELLY_CLOUD_DEVICE_ID: optionalString,
+  SHELLY_CLOUD_CHANNEL: intFromEnv(0, 0, 7),
+  PLUG_HA_ENTITY: optionalString,
 
   // Storage (Upstash Redis / Vercel KV-compatible REST credentials)
   UPSTASH_REDIS_REST_URL: optionalUrl,
@@ -119,6 +129,7 @@ export interface AppConfig {
     homeAssistantToken?: string;
     webhookUrl?: string;
     webhookSecret?: string;
+    plug: EnvPlugConfig;
   };
   storage: {
     redisUrl?: string;
@@ -182,6 +193,16 @@ export function parseConfig(env: Record<string, string | undefined> = process.en
       homeAssistantToken: e.HOME_ASSISTANT_TOKEN,
       webhookUrl: e.DEVICE_WEBHOOK_URL,
       webhookSecret: e.DEVICE_WEBHOOK_SECRET,
+      plug: {
+        provider: e.PLUG_PROVIDER,
+        shellyHost: e.SHELLY_HOST,
+        shellySwitchId: e.SHELLY_SWITCH_ID,
+        shellyCloudServer: e.SHELLY_CLOUD_SERVER,
+        shellyCloudAuthKey: e.SHELLY_CLOUD_AUTH_KEY,
+        shellyCloudDeviceId: e.SHELLY_CLOUD_DEVICE_ID,
+        shellyCloudChannel: e.SHELLY_CLOUD_CHANNEL,
+        haEntity: e.PLUG_HA_ENTITY,
+      },
     },
     storage: {
       redisUrl: e.UPSTASH_REDIS_REST_URL ?? e.KV_REST_API_URL,

@@ -27,6 +27,7 @@ import { Masthead } from "./layout/Masthead";
 import { HowItWorksDialog } from "./layout/HowItWorksDialog";
 import { NewsSection, StatusSidebar } from "./layout/StatusSidebar";
 import { BluetoothPanel } from "./devices/BluetoothPanel";
+import { SmartPlugPanel } from "./devices/SmartPlugPanel";
 import { NewsPanel } from "./news/NewsPanel";
 import { describeCommand } from "./cards/InterventionPlanCard";
 import { bridgeReady, sendApprovedCommand } from "@/lib/client/bluetooth";
@@ -565,7 +566,8 @@ export function AgentApp() {
           <NewsSection id="sb-news" title="News & talks">
             <NewsPanel place={newsPlace} />
           </NewsSection>
-          <NewsSection id="sb-devices" title="Nearby devices">
+          <NewsSection id="sb-devices" title="Devices">
+            <SmartPlugPanel conversationId={conversationId} />
             <BluetoothPanel onShareReadings={(t) => send(t)} canShare={!busy && pending.length === 0 && !restoring} />
           </NewsSection>
         </StatusSidebar>

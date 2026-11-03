@@ -1,5 +1,5 @@
 import type { AppConfig } from "../config";
-import { createDeviceAdapter, type DeviceAdapter } from "../devices";
+import { checkPlug, createDeviceAdapter, describePlug, plugFromEnv, type DeviceAdapter, type PlugSettings } from "../devices";
 import type { MonitoringDecision } from "../domain";
 import type { Approval, DeviceActionResult, HealthProfile, Intervention, LocationQuery, Session, SessionScene } from "../domain";
 import { AppError, UpstreamError, errorMessage } from "../errors";
@@ -227,6 +227,64 @@ export class AgentRunner {
       await this.save(session);
       return session;
     });
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Smart plug                                                        */
+  /* ---------------------------------------------------------------- */
+
+  private haCreds() {
+    const d = this.cfg.devices;
+    return d.homeAssistantUrl && d.homeAssistantToken ? { url: d.homeAssistantUrl, token: d.homeAssistantToken } : undefined;
+  }
+
+  /** What a purifier on/off approval will drive. Secret-free (no auth keys or tokens). */
+  async plugInfo(sessionId?: string) {
+    const session = sessionId ? await this.deps.store.getSession(sessionId) : undefined;
+    const env = plugFromEnv(this.cfg.devices.plug);
+    const plug = session?.plug ?? env;
+    return {
+      connected: Boolean(plug),
+      source: session?.plug ? ("session" as const) : env ? ("env" as const) : null,
+      provider: plug?.provider ?? null,
+      label: plug ? describePlug(plug) : null,
+      baseAdapter: this.cfg.devices.adapter,
+      homeAssistantAvailable: Boolean(this.haCreds()),
+    };
+  }
+
+  /** Save (or clear with null) this conversation's smart plug. Never actuates anything. */
+  async setPlug(sessionId: string, plug: PlugSettings | null) {
+    if (plug?.provider === "homeassistant" && !this.haCreds()) {
+      throw new AppError("config_missing", "A Home Assistant plug needs HOME_ASSISTANT_URL and HOME_ASSISTANT_TOKEN set on the server.");
+    }
+    await this.getSession(sessionId);
+    await withLock(this.deps.store, this.lockKey(sessionId), 30_000, async () => {
+      const session = await this.getSession(sessionId);
+      if (plug) session.plug = plug;
+      else delete session.plug;
+      await this.save(session);
+    });
+    return this.plugInfo(sessionId);
+  }
+
+  /** Read-only connection check: reads the plug state, never switches it. */
+  async checkPlugConnection(sessionId?: string) {
+    const session = sessionId ? await this.deps.store.getSession(sessionId) : undefined;
+    const plug = session?.plug ?? plugFromEnv(this.cfg.devices.plug);
+    if (!plug) return { connected: false as const, reachable: false, on: null, online: false, message: "No plug connected." };
+    try {
+      const st = await checkPlug(plug, { fetchImpl: this.fetchImpl, timeoutMs: this.cfg.agent.toolTimeoutMs, ha: this.haCreds() });
+      return {
+        connected: true as const,
+        reachable: true,
+        on: st.on,
+        online: st.online,
+        message: `${describePlug(plug)}: ${st.online ? "online" : "offline"}${st.on === null ? "" : `, currently ${st.on ? "on" : "off"}`}.`,
+      };
+    } catch (err) {
+      return { connected: true as const, reachable: false, on: null, online: false, message: errorMessage(err) };
+    }
   }
 
   /* ---------------------------------------------------------------- */

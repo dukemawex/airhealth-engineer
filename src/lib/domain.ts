@@ -1,3 +1,4 @@
+import type { PlugSettings } from "./devices/plug";
 import { z } from "zod";
 import type { AirTwin } from "./airTwin";
 import { SPACE_TYPES, type SpaceType } from "./space";
@@ -350,6 +351,8 @@ export interface Session {
   userRef?: string;
   /** Latest photo analysis (structured output only; the image itself is never stored). */
   scene?: SessionScene;
+  /** Smart plug set in the Devices panel (server-side only; never returned to the client). */
+  plug?: PlugSettings;
 }
 
 export const SessionSceneSchema = z.object({
