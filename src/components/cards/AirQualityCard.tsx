@@ -4,6 +4,7 @@ import { snapshotPm25 } from "@/lib/agent/sessionState";
 import { formatPlace } from "@/lib/place";
 import { POLLUTANT_LABEL, categoryTone, fmtNum, fmtTime, humanize } from "../format";
 import { Sparkline } from "./Sparkline";
+import { ShareCardButton } from "./ShareCardButton";
 
 export function AirQualityCard({
   snapshot,
@@ -84,6 +85,13 @@ export function AirQualityCard({
         ) : null}
         Updated {fmtTime(snapshot.fetchedAt, true)}. {snapshot.sourceNote}
       </p>
+      {!compact && place && (
+        <div className="card-actions">
+          <ShareCardButton
+            input={{ place, pm25: pm25 ?? null, aqi: aqi ?? null, category: cat ?? null, measured }}
+          />
+        </div>
+      )}
     </section>
   );
 }
