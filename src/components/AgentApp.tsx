@@ -278,6 +278,7 @@ export function AgentApp() {
 
   const approvals = useMemo(() => latestApprovals(messages), [messages]);
   const pending = approvals.filter((a) => a.status === "pending");
+  const approvalById = useMemo(() => new Map(approvals.map((a) => [a.id, a])), [approvals]);
 
   // Open the approval modal once per new request, after the stream settles.
   useEffect(() => {
@@ -566,6 +567,7 @@ export function AgentApp() {
                         history={history}
                         busy={busy}
                         onReviewApproval={setReviewing}
+                        approvalById={approvalById}
                         onRetry={retry}
                         judge={judge.on}
                         onSendText={(t) => send(t)}

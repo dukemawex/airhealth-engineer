@@ -37,7 +37,10 @@ export function MessageBubble({
   onSendText,
   profileAskedBefore = false,
   isLast = false,
+  approvalById,
 }: {
+  /** Latest state of each approval, so an earlier card stops saying Pending once it is decided. */
+  approvalById?: Map<string, ApprovalView>;
   isLast?: boolean;
   profileAskedBefore?: boolean;
   judge?: boolean;
@@ -62,7 +65,7 @@ export function MessageBubble({
       </article>
     );
   }
-  return <AssistantBubble {...{ message, history, busy, onReviewApproval, onRetry, judge, onSendText, profileAskedBefore, isLast }} />;
+  return <AssistantBubble {...{ message, history, busy, onReviewApproval, onRetry, judge, onSendText, profileAskedBefore, isLast, approvalById }} />;
 }
 
 function AssistantBubble({
@@ -75,7 +78,9 @@ function AssistantBubble({
   onSendText,
   profileAskedBefore,
   isLast,
+  approvalById,
 }: {
+  approvalById?: Map<string, ApprovalView>;
   message: AgentUIMessage;
   history: Array<{ at: string; pm25?: number }>;
   busy: boolean;
@@ -128,7 +133,7 @@ function AssistantBubble({
           return <ToolResultCard key={key} part={view} history={history} onApplyStep={onSendText} busy={busy} />;
         }
         if (part.type === "data-approval") {
-          return <ApprovalRequestCard key={key} approval={part.data} onReview={onReviewApproval} busy={busy} />;
+          return <ApprovalRequestCard key={key} approval={approvalById?.get(part.data.id) ?? part.data} onReview={onReviewApproval} busy={busy} />;
         }
         if (part.type === "data-notice") {
           return <NoticeCard key={key} notice={part.data} onRetry={onRetry} busy={busy} />;
