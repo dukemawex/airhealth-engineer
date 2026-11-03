@@ -12,6 +12,9 @@ export const getHealthContextSchema = HealthProfileSchema.extend({
 const RESPIRATORY = /(asthma|copd|bronch|emphysema|cystic fibrosis|lung|respirat|allerg|rhinitis|sinus)/i;
 const CARDIO = /(heart|cardi|hypertens|blood pressure|stroke|arrhythm|angina|coronary)/i;
 const OTHER_SENSITIVE = /(pregnan|diabet|immun|cancer|chemo|kidney|sickle)/i;
+/** Respiratory symptoms that put someone in the sensitive (respiratory) group for air targets. */
+export const RESPIRATORY_SYMPTOMS =
+  /(wheez|cough|short(ness)? of breath|breathless|out of breath|chest tight|tight(ness in the)? chest|difficulty breathing|trouble breathing|hard to breathe|asthma (attack|flare))/i;
 const RED_FLAG_SYMPTOMS =
   /(chest pain|crushing|severe (shortness of breath|breathless)|can'?t (breathe|speak)|unable to (breathe|speak)|blue lips|cyanosis|confus|faint|unconscious|collapse|seizure)/i;
 
@@ -38,6 +41,8 @@ export function assessHealth(profile: HealthProfile) {
   if (conditions.some((c) => RESPIRATORY.test(c))) sensitivityReasons.push("respiratory condition");
   if (conditions.some((c) => CARDIO.test(c))) sensitivityReasons.push("cardiovascular condition");
   if (conditions.some((c) => OTHER_SENSITIVE.test(c))) sensitivityReasons.push("other at-risk condition");
+  const respSymptoms = symptoms.filter((s) => RESPIRATORY_SYMPTOMS.test(s) && !RED_FLAG_SYMPTOMS.test(s));
+  if (respSymptoms.length) sensitivityReasons.push(`respiratory symptoms: ${respSymptoms.join(", ")}`);
   if (profile.ageGroup && ["infant", "child", "older_adult"].includes(profile.ageGroup)) {
     sensitivityReasons.push(`age group: ${profile.ageGroup}`);
   }
@@ -67,8 +72,12 @@ export function assessHealth(profile: HealthProfile) {
   if (d.indoorPm25 !== undefined && d.indoorPm25 > 9) cautions.push(`indoor PM2.5 ${d.indoorPm25} µg/m³ (> 9)`);
 
   const sensitive = sensitivityReasons.length > 0;
+  const respiratory =
+    conditions.some((c) => RESPIRATORY.test(c)) || symptoms.some((s) => RESPIRATORY_SYMPTOMS.test(s));
   return {
     sensitiveGroup: sensitive,
+    /** Which sensitive group drives the tighter targets (respiratory first: it matters most for PM2.5). */
+    group: (sensitive ? (respiratory ? "respiratory" : "sensitive") : "general") as "respiratory" | "sensitive" | "general",
     sensitivityReasons,
     redFlags,
     urgentCareAdvised: redFlags.length > 0,

@@ -51,7 +51,11 @@ export const getAirQualityTool = defineTool({
       );
     }
     if (!location) {
-      return { error: "No location known for this session. Ask the user for a city or coordinates." };
+      return {
+        needsLocation: true,
+        error:
+          "No location on file yet. Call requestLocation now (it shows the user a Share-my-location card with a city box) and end your reply with one short line; do not ask for a city or coordinates in text.",
+      };
     }
     const snapshot = await fetchAirQuality(location, radiusMeters, {
       fetchImpl: ctx.fetchImpl,

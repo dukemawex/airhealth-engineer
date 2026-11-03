@@ -25,6 +25,7 @@ describe("agent loop", () => {
       "executeDeviceAction",
       "getStatus",
       "planForecast",
+      "requestLocation",
     ]);
     // Second call carries assistant tool_calls followed by the matching tool message.
     const msgs = model.requests[1]!.messages;

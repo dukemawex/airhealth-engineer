@@ -7,6 +7,7 @@ import { HealthContextSummary } from "./HealthContextSummary";
 import { InterventionPlanCard, describeCommand } from "./InterventionPlanCard";
 import { humanize } from "../format";
 import { ForecastPlanCard, type ForecastPlanOutput } from "./ForecastPlanCard";
+import { LocationRequestCard } from "../location/LocationRequestCard";
 
 export interface ToolPartView {
   toolName: string;
@@ -24,7 +25,15 @@ const TOOL_LABEL: Record<string, string> = {
   executeDeviceAction: "Preparing device action",
   getStatus: "Reviewing status",
   planForecast: "Planning the next 72 hours",
+  requestLocation: "Asking for your location",
 };
+
+/** True when this tool part is (or will render as) the Share-my-location card. */
+export function isLocationRequestPart(part: Pick<ToolPartView, "toolName" | "state" | "output">): boolean {
+  if (part.toolName === "requestLocation") return true;
+  const o = part.output as Record<string, unknown> | undefined;
+  return part.state === "output-available" && Boolean(o && o.needsLocation === true);
+}
 
 function Pending({ name }: { name: string }) {
   return (
@@ -70,7 +79,14 @@ export function ToolResultCard({
 
   // executeDeviceAction waits for approval: the approval card renders it.
   if (toolName === "executeDeviceAction" && state !== "output-available") return null;
+  if (toolName === "requestLocation") {
+    if (state !== "output-available") return <LocationRequestCard />;
+    if (output?.alreadyKnown) return null;
+    return <LocationRequestCard reason={typeof output?.reason === "string" ? output.reason : undefined} />;
+  }
   if (state !== "output-available") return <Pending name={toolName} />;
+  // "No location yet" is not a failure: show the friendly location card instead of "Not available".
+  if (output?.needsLocation === true) return <LocationRequestCard />;
   if (output && typeof output.error === "string") return <ErrorCard name={toolName} message={output.error} />;
 
   switch (toolName) {

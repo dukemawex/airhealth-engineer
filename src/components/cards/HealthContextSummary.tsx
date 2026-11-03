@@ -26,7 +26,13 @@ export function HealthContextSummary({
         </div>
         {assessment && (
           <span className="badge" data-tone={assessment.urgentCareAdvised ? "danger" : assessment.sensitiveGroup ? "watch" : "ok"}>
-            {assessment.urgentCareAdvised ? "Get help first" : assessment.sensitiveGroup ? "Sensitive group" : "General population"}
+            {assessment.urgentCareAdvised
+              ? "Get help first"
+              : assessment.sensitiveGroup
+                ? assessment.group === "respiratory"
+                  ? "Sensitive group · respiratory"
+                  : "Sensitive group"
+                : "General population"}
           </span>
         )}
       </div>
@@ -56,6 +62,12 @@ export function HealthContextSummary({
           <>
             <dt>Plans</dt>
             <dd>{profile.activityPlans}</dd>
+          </>
+        ) : null}
+        {assessment?.sensitiveGroup && assessment.sensitivityReasons?.length ? (
+          <>
+            <dt>Why tighter</dt>
+            <dd>{assessment.sensitivityReasons.join("; ")}</dd>
           </>
         ) : null}
         {assessment && (

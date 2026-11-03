@@ -14,7 +14,8 @@ import { geocodeDepsFromConfig, resolveLocation } from "../services/geocode";
 import { decideNotification } from "./monitor";
 import { recordAirQuality } from "./sessionState";
 import { mergeProfile } from "./tools/getHealthContext";
-import { dedupeProfileAsks, previousReplyAsked } from "./profileAsk";
+import { previousReplyAsked } from "./profileAsk";
+import { cleanReplyBlocks } from "./replyCopy";
 import { withLock, type StateStore } from "../storage";
 import { buildDeveloperPrompt } from "./prompt";
 import { buildStatusReport } from "./status";
@@ -440,7 +441,7 @@ export class AgentRunner {
     }
     const cleanRunText = (): string | null => {
       const texts = runAssistant.map((m) => (typeof m.content === "string" ? m.content : ""));
-      const cleaned = dedupeProfileAsks(texts, { alreadyAsked: profileAskedBefore });
+      const cleaned = cleanReplyBlocks(texts, { alreadyAsked: profileAskedBefore });
       runAssistant.forEach((m, k) => {
         if (typeof m.content === "string" && m.content !== cleaned[k]) m.content = cleaned[k] ?? "";
       });

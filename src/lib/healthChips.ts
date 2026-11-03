@@ -36,9 +36,9 @@ export const HEALTH_CHIPS: HealthChip[] = [
 /** Neutral starter prompts; none names a city. `useLocation` asks the device for a position first. */
 export const STARTER_PROMPTS: Array<{ id: string; label: string; message: string; useLocation?: boolean }> = [
   { id: "check-now", label: "Use my location and check the air now", message: "Check the air quality where I am right now and tell me what it means for me today.", useLocation: true },
-  { id: "commute", label: "Plan a safer route for my commute", message: "Plan a safer time and route for my commute today based on the air where I am." },
+  { id: "commute", label: "Plan a safer route for my commute", message: "Plan a safer time and route for my commute today based on the air where I am.", useLocation: true },
   { id: "purifier", label: "Set up my purifier for tonight", message: "Set up my air purifier and ventilation for tonight so I sleep in clean air." },
-  { id: "outdoors", label: "Is it OK to exercise outside today?", message: "Is it a good idea to exercise outdoors today where I am? Suggest the best time window." },
+  { id: "outdoors", label: "Is it OK to exercise outside today?", message: "Is it a good idea to exercise outdoors today where I am? Suggest the best time window.", useLocation: true },
 ];
 
 const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");

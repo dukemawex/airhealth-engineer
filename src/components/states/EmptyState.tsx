@@ -5,7 +5,7 @@ import type { HealthProfile, LocationQuery } from "@/lib/domain";
 import { activeChips, profileFromChips, STARTER_PROMPTS, toggleChipText } from "@/lib/healthChips";
 import { HealthChips } from "@/components/chat/HealthChips";
 import { ApiError } from "@/lib/client/api";
-import { GeoFailure, getCurrentFix, type Fix } from "@/lib/client/geolocation";
+import { GeoFailure, geoHelp, getCurrentFix, type Fix, type GeoFailureKind } from "@/lib/client/geolocation";
 import { previewPlace } from "@/lib/client/resolvePlace";
 import { useToday } from "@/lib/client/useToday";
 
@@ -107,7 +107,7 @@ export function EmptyState({
   onStart,
 }: {
   disabled: boolean;
-  onStart: (args: { message: string; location?: LocationQuery; profile?: HealthProfile }) => void;
+  onStart: (args: { message: string; location?: LocationQuery; profile?: HealthProfile; geoFailure?: GeoFailureKind }) => void;
 }) {
   const [fix, setFix] = useState<Fix | null>(null);
   const [fixLabel, setFixLabel] = useState<string | null>(null);
@@ -119,10 +119,12 @@ export function EmptyState({
   const today = useToday();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestText = useRef("");
+  const lastFailure = useRef<GeoFailureKind | null>(null);
 
   const locate = async (): Promise<Fix | null> => {
     setGeoState("locating");
     setGeoError(null);
+    lastFailure.current = null;
     setPlace("");
     setPreview({ status: "idle" });
     try {
@@ -141,7 +143,10 @@ export function EmptyState({
     } catch (err) {
       setFix(null);
       setGeoState("error");
-      setGeoError(err instanceof GeoFailure ? err.message : "Couldn't get your location. Type your city, area or postcode instead.");
+      const kind: GeoFailureKind = err instanceof GeoFailure ? err.kind : "unavailable";
+      const help = geoHelp(kind);
+      setGeoError(help.hint ? `${help.message} ${help.hint}` : help.message);
+      lastFailure.current = kind;
       return null;
     }
   };
@@ -193,13 +198,15 @@ export function EmptyState({
     let f = fix;
     if (p.useLocation && !typed && !f) {
       f = await locate();
-      if (!f) return; // the location status line explains what went wrong
+      // Denied / timed out: still start. The agent answers with the Share-my-location card,
+      // which repeats why it failed (with iOS / Android steps) and offers a city box.
     }
     const where = whereSentence(f);
     onStart({
       message: `${where ? `${where} ` : ""}${p.message}${whoSentence}`,
       location: currentLocation(f),
       profile: profileFromChips(activeChips(health)),
+      geoFailure: p.useLocation && !f && !typed ? (lastFailure.current ?? undefined) : undefined,
     });
   };
 

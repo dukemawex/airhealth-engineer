@@ -1,13 +1,16 @@
 import { z } from "zod";
 import { AppError } from "../../errors";
 import { adaptPlanForSpace, FORECAST_PLAN_JSON_SCHEMA, ForecastPlanSchema, normalisePlan, plannerPrompt, rulesPlan, type ForecastPlan } from "../../forecast/plan";
+import { bestOutdoorWindow } from "../../forecast/outdoorWindow";
 import { fetchForecast, forecastWindows } from "../../services/forecast";
 import { spaceFromSetting } from "../../space";
+import { assessHealth } from "./getHealthContext";
 import { defineTool } from "./types";
 
 export const planForecastSchema = z.object({
   horizonHours: z.number().int().min(12).max(72).default(72).describe("How far ahead to plan, hours (max 72)"),
   focus: z.string().trim().max(200).optional().describe("Optional user focus, e.g. 'protect the nursery overnight'"),
+  outdoorMinutes: z.number().int().min(30).max(240).optional().describe("Length of a planned outdoor activity (exercise, walk, commute) in minutes; sizes the best outdoor window (default 120)"),
 });
 
 const PLANNER_EFFORT = (process.env.FORECAST_PLANNER_EFFORT === "max" ? "max" : process.env.FORECAST_PLANNER_EFFORT === "medium" ? "medium" : "high") as "max" | "high" | "medium";
@@ -20,13 +23,18 @@ const PLANNER_EFFORT = (process.env.FORECAST_PLANNER_EFFORT === "max" ? "max" : 
 export const planForecastTool = defineTool({
   name: "planForecast",
   description:
-    "Fetch the next 72 h of CAMS air-quality forecast for the session's location and build a time-boxed indoor-air control plan (purifier, windows, HVAC). Returns forecast + plan steps with proposed device commands. Does NOT run devices: each step is approved separately via executeDeviceAction. Call after getAirQuality when the user asks about the coming days, tonight, or planning ahead.",
+    "Fetch the next 72 h of CAMS air-quality forecast for the session's location and build a time-boxed indoor-air control plan (purifier, windows, HVAC). Returns forecast + plan steps with proposed device commands. Does NOT run devices: each step is approved separately via executeDeviceAction. Also returns outdoorWindow: the cleanest daylight window today/tomorrow for exercise, a walk or a commute (quote its summary). Call after getAirQuality when the user asks about the coming days, tonight, planning ahead, or WHEN to exercise / go outside / commute.",
   schema: planForecastSchema,
   requiresApproval: false,
   timeoutMs: 110_000,
   async execute(args, ctx) {
     const loc = ctx.session.location;
-    if (!loc) throw new AppError("bad_request", "No location yet: call getAirQuality with the user's place first.");
+    if (!loc) {
+      return {
+        needsLocation: true,
+        error: "No location on file yet. Call requestLocation (it shows the user a Share-my-location card) and stop; do not ask for a city in text.",
+      };
+    }
     const forecast = await fetchForecast(loc, {
       fetchImpl: ctx.fetchImpl,
       logger: ctx.logger,
@@ -79,7 +87,13 @@ export const planForecastTool = defineTool({
       plan = rulesPlan(windows, undefined, undefined, space);
       planner = { kind: "rules-fallback", reason: err instanceof Error ? err.message.slice(0, 160) : "planner error" };
     }
+    const threshold = p ? assessHealth(p).actionThresholdPm25 : 35.4;
+    const outdoorWindow = bestOutdoorWindow(
+      forecast.hours.map((h) => ({ t: h.time, pm25: h.pm25 })),
+      { thresholdPm25: threshold, durationHours: (args.outdoorMinutes ?? 120) / 60 },
+    );
     return {
+      outdoorWindow,
       forecast: {
         location: forecast.location,
         timezone: forecast.timezone,

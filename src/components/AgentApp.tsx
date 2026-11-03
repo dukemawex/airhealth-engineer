@@ -32,6 +32,9 @@ import { NewsPanel } from "./news/NewsPanel";
 import { describeCommand } from "./cards/InterventionPlanCard";
 import { bridgeReady, sendApprovedCommand } from "@/lib/client/bluetooth";
 import { EmptyState } from "./states/EmptyState";
+import { GeoFailure, getCurrentFix, type GeoFailureKind } from "@/lib/client/geolocation";
+import { shouldLocateBeforeSend } from "@/lib/client/locationIntent";
+import { LocationActionsContext, type LocationActions } from "./location/LocationContext";
 import { LoadingState, SuccessToast } from "./states/States";
 
 const STATUS_POLL_MS = 30_000;
@@ -294,7 +297,35 @@ export function AgentApp() {
     if (el && stick.current) el.scrollTop = el.scrollHeight;
   }, [messages, busy]);
 
-  const send = (text: string, location?: LocationQuery, profile?: HealthProfile, shared?: { imageUrl: string; result: VisionResult; kind: "photo" | "video_frame" }) => {
+  const [geoFailure, setGeoFailure] = useState<GeoFailureKind | null>(null);
+  const [locating, setLocating] = useState(false);
+  type Shared = { imageUrl: string; result: VisionResult; kind: "photo" | "video_frame" };
+
+  /**
+   * Send, asking the device for a fix first when the message is about "my location" / "where I am"
+   * (the model cannot read the browser's GPS). If that fails, send anyway: the agent replies with the
+   * Share-my-location card, which shows why it failed and offers a city box.
+   */
+  const send = (text: string, location?: LocationQuery, profile?: HealthProfile, shared?: Shared) => {
+    if (!location && !shared && shouldLocateBeforeSend(text, Boolean(status?.location))) {
+      setBanner(null);
+      setLocating(true);
+      void getCurrentFix()
+        .then((f) => {
+          setGeoFailure(null);
+          sendNow(text, { latitude: f.latitude, longitude: f.longitude, accuracyMeters: f.accuracy }, profile);
+        })
+        .catch((err: unknown) => {
+          setGeoFailure(err instanceof GeoFailure ? err.kind : "unavailable");
+          sendNow(text, undefined, profile);
+        })
+        .finally(() => setLocating(false));
+      return;
+    }
+    sendNow(text, location, profile, shared);
+  };
+
+  const sendNow = (text: string, location?: LocationQuery, profile?: HealthProfile, shared?: Shared) => {
     setBanner(null);
     stopSpeaking();
     const scene: SessionScene | undefined = shared && {
@@ -454,7 +485,18 @@ export function AgentApp() {
   };
   const traceTotals = totalTraces(messages.flatMap((m) => m.parts.flatMap((p) => (p.type === "data-trace" ? [p.data] : []))));
 
+  const locationActions: LocationActions = {
+    share: (location, label) => {
+      setGeoFailure(null);
+      sendNow(label, location);
+    },
+    known: status?.location ? (placeLabel ?? status.location.name ?? status.location.area ?? "your shared location") : null,
+    busy: busy || locating,
+    lastFailure: geoFailure,
+  };
+
   return (
+    <LocationActionsContext.Provider value={locationActions}>
     <div className="app">
       <a href="#composer-input" className="skip-link">
         Skip to message box
@@ -491,7 +533,13 @@ export function AgentApp() {
                 {restoring ? (
                   <LoadingState label="Restoring your conversation" />
                 ) : messages.length === 0 ? (
-                  <EmptyState disabled={busy} onStart={({ message, location, profile }) => send(message, location, profile)} />
+                  <EmptyState
+                    disabled={busy || locating}
+                    onStart={({ message, location, profile, geoFailure: failed }) => {
+                      setGeoFailure(failed ?? null);
+                      sendNow(message, location, profile);
+                    }}
+                  />
                 ) : (
                   <>
                     <header className="briefing-head">
@@ -508,9 +556,10 @@ export function AgentApp() {
                       <hr className="rule-double" />
                     </header>
                     <StudioGallery scenes={galleryScenes} />
-                    {messages.map((m) => (
+                    {messages.map((m, idx) => (
                       <MessageBubble
                         key={m.id}
+                        isLast={idx === messages.length - 1}
                         message={m}
                         profileAskedBefore={askFlags.get(m.id) ?? false}
                         history={history}
@@ -526,6 +575,11 @@ export function AgentApp() {
                 {visionJob && (
                   <SceneProgress imageUrl={visionJob.imageUrl} stage={visionJob.stage} error={visionJob.error} onDismiss={() => setVisionJob(null)} />
                 )}
+                {locating && (
+                  <div className="banner" data-tone="info" role="status">
+                    <span>Asking your device for a position… (allow location when your browser asks)</span>
+                  </div>
+                )}
                 {chatStatus === "submitted" && <LoadingState />}
                 {banner && (
                   <div className="banner" data-tone="error" role="alert">
@@ -540,7 +594,7 @@ export function AgentApp() {
               </div>
             </div>
             <Composer
-              disabled={busy || pending.length > 0 || restoring || Boolean(visionJob && !visionJob.error)}
+              disabled={busy || locating || pending.length > 0 || restoring || Boolean(visionJob && !visionJob.error)}
               busy={busy}
               onSend={(t, profile) => send(t, undefined, profile)}
               onAttach={(f, note) => void analyzeMedia(f, note)}
@@ -587,6 +641,7 @@ export function AgentApp() {
       />
       <SuccessToast message={toast} onDone={() => setToast(null)} />
     </div>
+    </LocationActionsContext.Provider>
   );
 }
 

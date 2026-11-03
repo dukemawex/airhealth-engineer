@@ -22,6 +22,40 @@ export const GEO_MESSAGES: Record<GeoFailureKind, string> = {
   unavailable: "Your device couldn't determine a position (location services may be off). Type your area instead.",
 };
 
+export type GeoPlatform = "ios" | "android" | "other";
+
+/** Best-effort platform sniff, only used to pick which settings path to show. */
+export function detectPlatform(ua?: string, maxTouchPoints?: number): GeoPlatform {
+  const u = ua ?? (typeof navigator !== "undefined" ? navigator.userAgent : "");
+  const touch = maxTouchPoints ?? (typeof navigator !== "undefined" ? navigator.maxTouchPoints : 0);
+  if (/iPhone|iPad|iPod/i.test(u) || (/Macintosh/i.test(u) && touch > 1)) return "ios";
+  if (/Android/i.test(u)) return "android";
+  return "other";
+}
+
+const PLATFORM_HINTS: Partial<Record<GeoFailureKind, Partial<Record<GeoPlatform, string>>>> = {
+  denied: {
+    ios: "On iPhone/iPad: Settings → Privacy & Security → Location Services → On, then Safari Websites → While Using the App. In Safari tap aA → Website Settings → Location → Allow, then try again.",
+    android: "On Android: tap the lock/tune icon next to the address → Permissions → Location → Allow, and make sure Location is on in quick settings.",
+    other: "Click the icon next to the address bar → Site settings → Location → Allow, then try again.",
+  },
+  unavailable: {
+    ios: "On iPhone/iPad: Settings → Privacy & Security → Location Services must be on (and Precise Location helps).",
+    android: "On Android: turn Location on in quick settings (Google Location Accuracy helps indoors).",
+  },
+  timeout: {
+    ios: "On iPhone/iPad, Wi-Fi on (even unconnected) gives a much faster fix indoors.",
+  },
+  insecure: {
+    ios: "Open the https:// link of this app in Safari; iOS never shares location with plain http pages.",
+  },
+};
+
+/** Failure message plus the settings path for this device (iOS, Android or desktop). */
+export function geoHelp(kind: GeoFailureKind, platform: GeoPlatform = detectPlatform()): { message: string; hint: string | null } {
+  return { message: GEO_MESSAGES[kind], hint: PLATFORM_HINTS[kind]?.[platform] ?? null };
+}
+
 export interface Fix {
   latitude: number;
   longitude: number;
