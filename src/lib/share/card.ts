@@ -49,3 +49,21 @@ export function cardLines(input: ShareInput, now = new Date()) {
     footer: "AirHealth Engineer · indoor-air control, not medical advice",
   };
 }
+
+/** Plain-text message for WhatsApp, deterministic from the live snapshot. */
+export function whatsappText(input: ShareInput, origin?: string): string {
+  const parts = [
+    `Air today in ${input.place}:`,
+    input.aqi !== null ? `US AQI ${input.aqi}` : "no AQI reading",
+    input.pm25 !== null ? `(PM2.5 ${input.pm25.toFixed(1)} µg/m³, ${input.measured ? "measured, OpenAQ" : "modelled, CAMS"})` : "",
+    input.category ? `· ${categoryLabel(input.category)}.` : "",
+  ].filter(Boolean);
+  const lines = [parts.join(" "), input.action ?? "I'm engineering my indoor air: filtration on, windows timed to the forecast."];
+  lines.push(`Checked with AirHealth Engineer${origin ? `: ${origin}` : ""} (air and device control, not medical advice).`);
+  return lines.join("\n");
+}
+
+/** wa.me link that opens WhatsApp with the text pre-filled; the user picks the chat and presses send. */
+export function whatsappUrl(text: string): string {
+  return `https://wa.me/?text=${encodeURIComponent(text)}`;
+}

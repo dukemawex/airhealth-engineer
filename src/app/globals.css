@@ -3440,3 +3440,7 @@ dialog.camera-sheet::backdrop {
 .air-twin-legend .swatch.asis { border-top: 2px dashed var(--color-danger); }
 .air-twin-assumptions { font-size: var(--text-xs, 12px); color: var(--color-text-muted); }
 .air-twin-assumptions summary { cursor: pointer; }
+
+/* WhatsApp share (user-initiated only) */
+.whatsapp-btn { display: inline-flex; align-items: center; gap: 6px; }
+.whatsapp-btn svg { color: #25d366; }
