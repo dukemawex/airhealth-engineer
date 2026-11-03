@@ -27,8 +27,10 @@ export function MessageBubble({
   onReviewApproval,
   onRetry,
   judge = false,
+  onSendText,
 }: {
   judge?: boolean;
+  onSendText?: (text: string) => void;
   message: AgentUIMessage;
   history: Array<{ at: string; pm25?: number }>;
   busy: boolean;
@@ -68,7 +70,7 @@ export function MessageBubble({
           );
         }
         if (part.type === "dynamic-tool") {
-          return <ToolResultCard key={key} part={part as unknown as ToolPartView} history={history} />;
+          return <ToolResultCard key={key} part={part as unknown as ToolPartView} history={history} onApplyStep={onSendText} busy={busy} />;
         }
         if (part.type === "data-approval") {
           return <ApprovalRequestCard key={key} approval={part.data} onReview={onReviewApproval} busy={busy} />;

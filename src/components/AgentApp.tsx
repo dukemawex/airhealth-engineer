@@ -466,6 +466,7 @@ export function AgentApp() {
                         onReviewApproval={setReviewing}
                         onRetry={retry}
                         judge={judge.on}
+                        onSendText={(t) => send(t)}
                       />
                     ))}
                   </>

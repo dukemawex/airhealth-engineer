@@ -6,6 +6,7 @@ import { AirQualityCard } from "./AirQualityCard";
 import { HealthContextSummary } from "./HealthContextSummary";
 import { InterventionPlanCard, describeCommand } from "./InterventionPlanCard";
 import { humanize } from "../format";
+import { ForecastPlanCard, type ForecastPlanOutput } from "./ForecastPlanCard";
 
 export interface ToolPartView {
   toolName: string;
@@ -18,10 +19,11 @@ export interface ToolPartView {
 
 const TOOL_LABEL: Record<string, string> = {
   getAirQuality: "Checking air quality",
-  getHealthContext: "Assessing health context",
+  getHealthContext: "Reading sensitivity profile",
   designIntervention: "Designing intervention",
   executeDeviceAction: "Preparing device action",
   getStatus: "Reviewing status",
+  planForecast: "Planning the next 72 hours",
 };
 
 function Pending({ name }: { name: string }) {
@@ -50,7 +52,17 @@ function ErrorCard({ name, message }: { name: string; message: string }) {
   );
 }
 
-export function ToolResultCard({ part, history }: { part: ToolPartView; history?: Array<{ at: string; pm25?: number }> }) {
+export function ToolResultCard({
+  part,
+  history,
+  onApplyStep,
+  busy,
+}: {
+  part: ToolPartView;
+  history?: Array<{ at: string; pm25?: number }>;
+  onApplyStep?: (text: string) => void;
+  busy?: boolean;
+}) {
   const { toolName, state } = part;
   const output = part.output as Record<string, unknown> | undefined;
 
@@ -71,6 +83,8 @@ export function ToolResultCard({ part, history }: { part: ToolPartView; history?
           assessment={output?.assessment as ReturnType<typeof assessHealth>}
         />
       );
+    case "planForecast":
+      return <ForecastPlanCard output={output as unknown as ForecastPlanOutput} onApplyStep={onApplyStep} busy={busy} />;
     case "designIntervention":
       return (
         <InterventionPlanCard

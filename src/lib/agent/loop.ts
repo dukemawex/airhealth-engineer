@@ -364,6 +364,7 @@ export class AgentRunner {
       logger: log,
       getDeviceAdapter: this.getDeviceAdapter,
       httpTimeoutMs: Math.max(2000, Math.floor(this.cfg.agent.toolTimeoutMs / 3)),
+      model: this.deps.model,
     };
 
     const finish = async (status: RunStatus, reply: string | null, iterations: number): Promise<RunResult> => {
@@ -532,7 +533,7 @@ export class AgentRunner {
     if (!tool.execute) return fail(`Tool '${tool.name}' is not executable.`);
     const t0 = Date.now();
     try {
-      const result = await withTimeout(tool.execute(parsed.data, ctx), this.cfg.agent.toolTimeoutMs, `tool ${tool.name}`);
+      const result = await withTimeout(tool.execute(parsed.data, ctx), tool.timeoutMs ?? this.cfg.agent.toolTimeoutMs, `tool ${tool.name}`);
       log.info("tool executed", { latencyMs: Date.now() - t0 });
       return { kind: "result", ok: true, content: json(result) };
     } catch (err) {

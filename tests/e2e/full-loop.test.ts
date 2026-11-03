@@ -147,7 +147,7 @@ describe("e2e: autonomous loop over HTTP with a scripted Muse Spark", () => {
     const tools = first.body?.tools as Array<{ type: string; function: { name: string } }>;
     expect(tools.every((t) => t.type === "function")).toBe(true);
     expect(tools.map((t) => t.function.name).sort()).toEqual(
-      ["designIntervention", "executeDeviceAction", "getAirQuality", "getHealthContext", "getStatus"].sort(),
+      ["designIntervention", "executeDeviceAction", "getAirQuality", "getHealthContext", "getStatus", "planForecast"].sort(),
     );
     // Each tool result answers its call id.
     const toolMsgs = (chatRequests[1]!.body!.messages as ChatMessage[]).filter((m) => m.role === "tool");

@@ -5,6 +5,7 @@ import type { FetchLike } from "../../http";
 import type { Logger } from "../../logger";
 import type { StateStore } from "../../storage";
 import type { DeviceAdapter } from "../../devices";
+import type { ModelClient } from "../../meta/types";
 
 export interface ToolContext {
   /** Mutable working copy of the session; the loop persists it after each step. */
@@ -16,6 +17,8 @@ export interface ToolContext {
   getDeviceAdapter: () => DeviceAdapter;
   /** Per-HTTP-request timeout for upstream calls made inside a tool (tool timeout / 3). */
   httpTimeoutMs: number;
+  /** Muse Spark client for tools that plan with the model (optional in tests). */
+  model?: ModelClient;
 }
 
 export interface AgentTool<S extends z.ZodType = z.ZodType> {
@@ -27,6 +30,8 @@ export interface AgentTool<S extends z.ZodType = z.ZodType> {
    * approval and pauses; execution happens only via the approval endpoint.
    */
   requiresApproval: boolean;
+  /** Override the default per-tool timeout (e.g. model-backed planners). */
+  timeoutMs?: number;
   /** Inline execution for non-gated tools. */
   execute?: (args: z.infer<S>, ctx: ToolContext) => Promise<unknown>;
   /** Optional pre-approval validation for gated tools; return an error string to refuse. */

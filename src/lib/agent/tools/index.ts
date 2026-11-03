@@ -5,6 +5,7 @@ import { executeDeviceActionTool } from "./executeDeviceAction";
 import { getAirQualityTool } from "./getAirQuality";
 import { getHealthContextTool } from "./getHealthContext";
 import { getStatusTool } from "./getStatus";
+import { planForecastTool } from "./planForecast";
 import type { AgentTool } from "./types";
 
 export type { AgentTool, ToolContext } from "./types";
@@ -15,6 +16,7 @@ export const TOOLS: AgentTool[] = [
   designInterventionTool,
   executeDeviceActionTool,
   getStatusTool,
+  planForecastTool,
 ] as AgentTool[];
 
 export function toolRegistry(tools: AgentTool[] = TOOLS): Map<string, AgentTool> {
