@@ -7,7 +7,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
  * - Dictation via the Web Speech API (SpeechRecognition; Chrome, Edge, Safari). Where it is missing
  *   (e.g. Firefox) the mic button is hidden and typing works as before.
  * - Spoken replies via speechSynthesis, off by default, remembered per device.
- * No audio is sent to our server; Muse Spark only ever receives the transcribed text.
+ * This is the fallback engine; see voice.ts for Muse Voice Transcribe (preferred).
  */
 
 /* -------------------------------- Recognition -------------------------------- */

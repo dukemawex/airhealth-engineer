@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { useDictation, useSpeakPreference } from "@/lib/client/speech";
+import { useSpeakPreference } from "@/lib/client/speech";
+import { useVoiceInput } from "@/lib/client/voice";
 import type { HealthProfile } from "@/lib/domain";
 import { activeChips, composerContext, profileFromChips, toggleComposerChip } from "@/lib/healthChips";
 import { HealthChips } from "./HealthChips";
@@ -55,7 +56,7 @@ export function Composer({
   const [chipsOpen, setChipsOpen] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const dictation = useDictation((heard) => {
+  const dictation = useVoiceInput((heard) => {
     if (!heard) return;
     setText((t) => (t.trim() ? `${t.trimEnd()} ${heard}` : heard));
     ref.current?.focus();
@@ -83,7 +84,7 @@ export function Composer({
     disabledReason ??
     "Enter to send · Shift+Enter for a new line · Device actions always ask for your approval first.";
   return (
-    <div className="composer" data-listening={dictation.listening}>
+    <div className="composer" data-listening={dictation.listening || dictation.transcribing}>
       {showHealthChips && chipsOpen && (
         <div id="composer-chips" className="composer-chips">
           <HealthChips
@@ -115,7 +116,7 @@ export function Composer({
             aria-describedby="composer-hint composer-interim"
           />
           <p id="composer-interim" className="composer-interim" aria-live="polite">
-            {dictation.listening ? dictation.interim || "Listening…" : ""}
+            {dictation.listening || dictation.transcribing ? dictation.interim || "Listening…" : ""}
           </p>
         </div>
         {onAttach && (
@@ -155,8 +156,16 @@ export function Composer({
             onClick={dictation.listening ? dictation.stop : dictation.start}
             aria-pressed={dictation.listening}
             aria-label={dictation.listening ? "Stop voice input" : "Speak your message"}
-            title={dictation.listening ? "Stop voice input" : "Speak your message"}
-            disabled={disabled && !dictation.listening}
+            title={
+              dictation.listening
+                ? "Stop voice input"
+                : dictation.engine === "muse"
+                  ? "Speak your message (transcribed by Muse Voice Transcribe)"
+                  : "Speak your message (browser dictation)"
+            }
+            data-engine={dictation.engine}
+            aria-busy={dictation.transcribing}
+            disabled={(disabled && !dictation.listening) || dictation.transcribing}
           >
             <MicIcon />
           </button>
