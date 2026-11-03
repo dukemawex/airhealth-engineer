@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SPACE_TYPES, type SpaceType } from "./space";
 import { SceneAnalysisSchema } from "./vision/scene";
 import type { ChatMessage, ToolCall } from "./meta/types";
 
@@ -178,12 +179,23 @@ export type DeviceCommand = z.infer<typeof DeviceCommandSchema>;
 /* Intervention design                                                 */
 /* ------------------------------------------------------------------ */
 
+/** Ventilation modes that need an enclosed room; dropped or mapped for open spaces. */
+export const INDOOR_VENT_MODES = ["closed_recirculate", "mechanical_filtered", "windows_open", "purge"] as const;
+/** Airflow steps for open-sided or outdoor spaces. */
+export const OPEN_AIR_MODES = ["open_dispersion", "stay_upwind", "reduce_source"] as const;
+
 const HHMM = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:MM 24h local time");
 
 export const InterventionDesignSchema = z.object({
   title: z.string().trim().min(3).max(160),
   objective: z.string().trim().min(3).max(1000),
   riskSummary: z.string().trim().min(3).max(1500),
+  space: z
+    .enum(SPACE_TYPES)
+    .optional()
+    .describe(
+      "Where the exposure happens: indoor (enclosed room), semi_open (open-sided shelter, veranda, open-air kitchen) or outdoor. Defaults to the latest photo's setting. semi_open and outdoor plans get no purifier CADR/ACH target and no window or HVAC schedule.",
+    ),
   room: z
     .object({
       name: z.string().max(80).optional(),
@@ -208,13 +220,13 @@ export const InterventionDesignSchema = z.object({
     notes: z.string().max(1000).optional(),
   }),
   ventilation: z.object({
-    strategy: z.enum(["seal_and_recirculate", "controlled_mechanical", "natural_when_clean", "purge"]),
+    strategy: z.enum(["seal_and_recirculate", "controlled_mechanical", "natural_when_clean", "purge", "open_air_dispersion"]),
     schedule: z
       .array(
         z.object({
           start: HHMM,
           end: HHMM,
-          mode: z.enum(["closed_recirculate", "mechanical_filtered", "windows_open", "purge"]),
+          mode: z.enum([...INDOOR_VENT_MODES, ...OPEN_AIR_MODES]),
           freshAirPercent: z.number().int().min(0).max(100).optional(),
           rationale: z.string().max(400),
         }),
@@ -235,7 +247,11 @@ export const InterventionDesignSchema = z.object({
     .max(10)
     .default([]),
   deviceCommands: z.array(DeviceCommandSchema).max(20).default([]),
-  healthPrecautions: z.array(z.string().max(400)).max(20).default([]),
+  exposureSteps: z
+    .array(z.string().max(400))
+    .max(20)
+    .default([])
+    .describe("Practical steps that cut exposure (move upwind, shorten time near smoke, cleaner hours). Environment only, never medical advice."),
   monitoringPlan: z.object({
     recheckIntervalMinutes: z.number().int().min(5).max(1440),
     escalationTriggers: z.array(z.string().max(300)).max(20).default([]),
@@ -250,6 +266,10 @@ export interface EngineeringChecks {
   targetAirChangesPerHour?: number;
   outdoorPm25?: number;
   outdoorPm25Category?: AqiCategory;
+  /** Space the checks were computed for; indoor sizing is skipped for open spaces. */
+  space?: SpaceType;
+  /** Indoor-only items skipped for this space, with the reason. */
+  notApplicable?: string[];
   warnings: string[];
 }
 

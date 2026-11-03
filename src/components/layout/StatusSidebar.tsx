@@ -56,7 +56,7 @@ export function StatusSidebar({
   const c = status?.combined;
   const skeleton = !status && loading;
   return (
-    <aside id="status-panel" className="sidebar" data-open={open} aria-label="Health-engineering status" aria-busy={skeleton}>
+    <aside id="status-panel" className="sidebar" data-open={open} aria-label="Air-engineering status" aria-busy={skeleton}>
       <div className="sidebar-head">
         <span className="kicker">
           The status desk<span className="sep" aria-hidden="true" />

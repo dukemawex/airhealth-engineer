@@ -21,12 +21,12 @@ export function HealthContextSummary({
         <div>
           <span className="kicker">Your sensitivity profile</span>
           <h3 className="card-title">
-            {assessment?.urgentCareAdvised ? "Red flags reported" : assessment?.sensitiveGroup ? "Extra protection advised" : "What you shared"}
+            {assessment?.urgentCareAdvised ? "Red flags reported" : assessment?.sensitiveGroup ? "Tighter air targets" : "What you shared"}
           </h3>
         </div>
         {assessment && (
           <span className="badge" data-tone={assessment.urgentCareAdvised ? "danger" : assessment.sensitiveGroup ? "watch" : "ok"}>
-            {assessment.urgentCareAdvised ? "Seek urgent care" : assessment.sensitiveGroup ? "Sensitive group" : "General population"}
+            {assessment.urgentCareAdvised ? "Get help first" : assessment.sensitiveGroup ? "Sensitive group" : "General population"}
           </span>
         )}
       </div>
@@ -44,11 +44,11 @@ export function HealthContextSummary({
         )}
         <dt>Conditions</dt>
         <dd>{conditions.length ? conditions.join(", ") : "None shared"}</dd>
-        <dt>Symptoms</dt>
+        <dt>How you feel</dt>
         <dd>{symptoms.length ? symptoms.join(", ") : "None shared"}</dd>
         {!compact && profile?.medications?.length ? (
           <>
-            <dt>Medications</dt>
+            <dt>Also shared</dt>
             <dd>{profile.medications.join(", ")}</dd>
           </>
         ) : null}
@@ -72,7 +72,7 @@ export function HealthContextSummary({
           ))}
         </ul>
       ) : null}
-      <p className="card-sub">Decision support only, not a diagnosis.</p>
+      <p className="card-sub">Sets air and device targets only. Not medical advice.</p>
     </section>
   );
 }

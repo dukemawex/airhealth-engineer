@@ -33,7 +33,7 @@ export function HowItWorksDialog({ open, onClose }: { open: boolean; onClose: ()
           <li>
             <strong>Tools fetch real data.</strong> <em>getAirQuality</em> geocodes your location and reads the nearest OpenAQ
             station (or modelled CAMS data, clearly labelled, if no station is nearby). <em>getHealthContext</em> records what you
-            shared and flags red-flag symptoms.
+            shared to set how strict the air targets are, and points you to a clinician first if you mention warning signs.
           </li>
           <li>
             <strong>An engineered plan.</strong> <em>designIntervention</em> validates the plan and computes checks such as
@@ -51,8 +51,8 @@ export function HowItWorksDialog({ open, onClose }: { open: boolean; onClose: ()
           </li>
         </ol>
         <p className="card-sub">
-          Your conversation is stored on the server so it survives reloads and approvals. Decision support only, not medical
-          advice: seek urgent care for severe symptoms.
+          Your conversation is stored on the server so it survives reloads and approvals. Air and device control only, not medical
+          advice: for severe breathing trouble, contact emergency services or a clinician.
         </p>
         <div className="modal-footer">
           <button type="button" className="btn btn-primary" onClick={onClose}>

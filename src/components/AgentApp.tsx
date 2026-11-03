@@ -14,6 +14,7 @@ import type { AgentUIMessage, ApprovalView } from "@/lib/ui-types";
 import { ApprovalModal } from "./cards/ApprovalModal";
 import { Composer } from "./chat/Composer";
 import { MessageBubble } from "./chat/MessageBubble";
+import { asksForProfile, dedupeProfileAsks } from "@/lib/agent/profileAsk";
 import { JudgePanel } from "./judge/JudgePanel";
 import { StudioGallery, type GalleryScene } from "./studio/StudioGallery";
 import { useJudgeMode } from "@/lib/client/judge";
@@ -403,6 +404,7 @@ export function AgentApp() {
   const newsPlace = status?.location?.name ?? status?.location?.area ?? undefined;
   const monitoringOn = Boolean(status?.monitoring?.enabled && status.location);
   const lastIsUser = messages.at(-1)?.role === "user";
+  const askFlags = profileAskFlags(messages);
   const galleryScenes: GalleryScene[] = messages.flatMap((m) =>
     m.role === "user" && m.metadata?.scene?.imageUrl ? [{ id: m.id, imageUrl: m.metadata.scene.imageUrl, result: m.metadata.scene.result }] : [],
   );
@@ -471,6 +473,7 @@ export function AgentApp() {
                       <MessageBubble
                         key={m.id}
                         message={m}
+                        profileAskedBefore={askFlags.get(m.id) ?? false}
                         history={history}
                         busy={busy}
                         onReviewApproval={setReviewing}
@@ -544,4 +547,20 @@ export function AgentApp() {
       <SuccessToast message={toast} onDone={() => setToast(null)} />
     </div>
   );
+}
+
+/**
+ * For each assistant reply: did the reply before it (as shown, after dedupe) ask
+ * for the sensitivity profile? Mirrors the server, which stores cleaned text.
+ */
+function profileAskFlags(messages: AgentUIMessage[]): Map<string, boolean> {
+  const flags = new Map<string, boolean>();
+  let lastShownAsk = false;
+  for (const m of messages) {
+    if (m.role !== "assistant") continue;
+    flags.set(m.id, lastShownAsk);
+    const texts = m.parts.flatMap((p) => (p.type === "text" && !p.text.startsWith("**Monitoring update**") ? [p.text] : []));
+    lastShownAsk = dedupeProfileAsks(texts, { alreadyAsked: lastShownAsk }).some((t) => asksForProfile(t));
+  }
+  return flags;
 }

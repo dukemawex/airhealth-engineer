@@ -72,7 +72,7 @@ export function SceneCard({ imageUrl, result, judge = false }: { imageUrl?: stri
             Photo read<span className="sep" aria-hidden="true" />
             Muse Spark vision {sam ? "+ SAM 3.1" : ""}
           </span>
-          <h3 className="card-title">{humanize(a.setting)} scene</h3>
+          <h3 className="card-title">{a.setting === "semi_open" ? "Open-sided" : humanize(a.setting)} scene</h3>
         </div>
         <span className="badge" data-tone={HAZE_TONE[a.visibleHaze]}>
           Haze: {a.visibleHaze}

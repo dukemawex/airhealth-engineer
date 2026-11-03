@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { DeviceCommandSchema, type DeviceCommand } from "../domain";
 import type { AirForecast, ForecastWindow } from "../services/forecast";
+import { INDOOR_ONLY_DEVICES, isOpenSpace, SPACE_LABEL, type SpaceType } from "../space";
 
 /**
  * A 72-hour indoor-air control plan: time-boxed steps that each may carry ONE device
@@ -138,6 +139,7 @@ export function plannerPrompt(input: {
   devices: string[];
   room: string | null;
   focus?: string;
+  space?: SpaceType;
 }): string {
   return [
     "You are the planning module of AirHealth Engineer, an agent that engineers indoor air by controlling purifiers, HVAC and windows to reduce exposure.",
@@ -147,6 +149,9 @@ export function plannerPrompt(input: {
     input.room ? `Room (from the user's latest photo): ${input.room}.` : "No room photo yet.",
     `Known devices: ${input.devices.length ? input.devices.join(", ") : "none registered yet; use conventional ids like fan.bedroom_purifier, cover.bedroom_window, climate.living_room"}.`,
     input.focus ? `User focus: ${input.focus}.` : "",
+    isOpenSpace(input.space)
+      ? `Space: ${SPACE_LABEL[input.space!]}. There are no windows, HVAC or room to filter: use deviceType 'none' and plan exposure timing, staying upwind of smoke, moving away from the source and reducing burning during the worst hours.`
+      : "",
     "CAMS forecast in 6-hour windows (PM2.5 µg/m³, US AQI):",
     JSON.stringify(input.windows),
     "Write 3-8 chronological steps that cover the forecast. Pre-empt peaks (start filtration 1-2 h before), open windows only in the cleanest windows, and keep purifier noise low overnight unless air is bad.",
@@ -156,8 +161,21 @@ export function plannerPrompt(input: {
     .join("\n");
 }
 
+/** Strip indoor-only device commands from a plan for an open-sided or outdoor space. */
+export function adaptPlanForSpace(plan: ForecastPlan, space: SpaceType | undefined): ForecastPlan {
+  if (!isOpenSpace(space)) return plan;
+  const indoor = new Set<string>(INDOOR_ONLY_DEVICES);
+  return { ...plan, steps: plan.steps.map((s) => (s.command && indoor.has(s.command.deviceType) ? { ...s, command: null } : s)) };
+}
+
 /** Deterministic plan from live forecast numbers, used only when Muse Spark planning is unavailable. */
-export function rulesPlan(windows: ForecastWindow[], purifierId = "fan.bedroom_purifier", windowId = "cover.bedroom_window"): ForecastPlan {
+export function rulesPlan(
+  windows: ForecastWindow[],
+  purifierId = "fan.bedroom_purifier",
+  windowId = "cover.bedroom_window",
+  space?: SpaceType,
+): ForecastPlan {
+  const open = isOpenSpace(space);
   const risk = (pm: number | null): PlanStep["risk"] => (pm === null ? "low" : pm > 55.4 ? "very_high" : pm > 35.4 ? "high" : pm > 12 ? "moderate" : "low");
   const merged: Array<{ start: string; end: string; risk: PlanStep["risk"]; max: number | null }> = [];
   for (const w of windows) {
@@ -170,7 +188,9 @@ export function rulesPlan(windows: ForecastWindow[], purifierId = "fan.bedroom_p
   }
   const steps = merged.slice(0, 8).map((m, i): PlanStep => {
     const bad = m.risk === "high" || m.risk === "very_high";
-    const command: DeviceCommand | null = bad
+    const command: DeviceCommand | null = open
+      ? null
+      : bad
       ? { deviceType: "air_purifier", deviceId: purifierId, action: "set_fan_speed", fanSpeedPercent: m.risk === "very_high" ? 100 : 70 }
       : m.risk === "low"
         ? { deviceType: "window", deviceId: windowId, action: "open" }
@@ -179,7 +199,17 @@ export function rulesPlan(windows: ForecastWindow[], purifierId = "fan.bedroom_p
       id: `step_${i + 1}`,
       startLocal: m.start,
       endLocal: m.end,
-      title: bad ? "Keep windows shut and filter hard" : m.risk === "low" ? "Ventilate while the air is clean" : "Purifier on auto, windows mostly closed",
+      title: open
+        ? bad
+          ? "Cut time here, stay upwind of smoke"
+          : m.risk === "low"
+            ? "Cleanest hours: do the smoky work now"
+            : "Stay upwind of any smoke source"
+        : bad
+          ? "Keep windows shut and filter hard"
+          : m.risk === "low"
+            ? "Ventilate while the air is clean"
+            : "Purifier on auto, windows mostly closed",
       why: `Forecast peak PM2.5 ${m.max ?? "n/a"} µg/m³ in this period.`,
       risk: m.risk,
       command,

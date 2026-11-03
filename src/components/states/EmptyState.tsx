@@ -389,7 +389,7 @@ export function EmptyState({
             />
             <HealthChips text={health} onToggle={(c) => setHealth((h) => toggleChipText(h, c))} disabled={disabled} />
             <span id="health-hint" className="hint">
-              Only tunes device thresholds and exposure windows. Not a diagnosis, not medical advice.
+              Only tunes device thresholds and exposure windows. Not medical advice.
             </span>
           </div>
           <div className="actions" style={{ justifyContent: "space-between" }}>

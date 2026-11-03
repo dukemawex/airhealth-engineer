@@ -88,7 +88,7 @@ export function ToolResultCard({
     case "designIntervention":
       return (
         <InterventionPlanCard
-          design={(part.input ?? {}) as Partial<InterventionDesign>}
+          design={(output?.design ?? part.input ?? {}) as Partial<InterventionDesign>}
           checks={output?.checks as EngineeringChecks}
           status={output?.status as string}
         />

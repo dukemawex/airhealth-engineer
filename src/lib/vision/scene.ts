@@ -10,7 +10,7 @@ import { z } from "zod";
  */
 
 export const HAZE_LEVELS = ["none", "light", "moderate", "heavy", "unclear"] as const;
-export const SETTINGS = ["indoor", "outdoor", "window_view", "unclear"] as const;
+export const SETTINGS = ["indoor", "semi_open", "outdoor", "window_view", "unclear"] as const;
 export const FILTER_STATES = ["clean", "dusty", "dirty", "not_visible"] as const;
 export const SOURCE_KINDS = ["combustion", "traffic", "cooking", "dust", "mould_damp", "smoke", "industrial", "other"] as const;
 
@@ -66,7 +66,12 @@ export const SCENE_JSON_SCHEMA: Record<string, unknown> = {
   ],
   properties: {
     summary: { type: "string", description: "Two sentences: what the photo shows that matters for indoor air." },
-    setting: { type: "string", enum: [...SETTINGS] },
+    setting: {
+      type: "string",
+      enum: [...SETTINGS],
+      description:
+        "indoor = enclosed room; semi_open = roofed but open-sided (cooking shelter, veranda, open-air kitchen, carport, market stall); outdoor = open air; window_view = indoor looking out.",
+    },
     visibleHaze: { type: "string", enum: [...HAZE_LEVELS], description: "Visible haze/smog/smoke in the air or through windows." },
     hazeEvidence: { type: "string", description: "The visual cues behind the haze judgement (contrast loss, colour cast, skyline blur)." },
     estimatedVisibilityKm: {
@@ -177,7 +182,7 @@ export interface VisionResult {
 export function describeSceneForAgent(a: SceneAnalysis, overlay?: { source: SceneOverlay["source"]; labels: string[] }): string {
   const parts = [
     `Photo analysis (Muse Spark vision, ${a.confidence} confidence): ${a.summary}`,
-    `Setting: ${a.setting}. Visible haze: ${a.visibleHaze} (${a.hazeEvidence})${a.estimatedVisibilityKm !== null ? `; est. visibility ~${a.estimatedVisibilityKm} km` : ""}.`,
+    `Setting: ${a.setting}${a.setting === "semi_open" || a.setting === "outdoor" ? " (open space: no purifier sizing, no window/HVAC schedule; plan dispersion, position upwind and source reduction)" : ""}. Visible haze: ${a.visibleHaze} (${a.hazeEvidence})${a.estimatedVisibilityKm !== null ? `; est. visibility ~${a.estimatedVisibilityKm} km` : ""}.`,
     `Room: ${a.room.windows} window(s), ${a.room.doors} door(s), purifier ${a.room.purifierVisible ? "visible" : "not visible"}, fan/AC ${a.room.fanOrAcVisible ? "visible" : "not visible"}, vents ${a.room.ventsVisible ? "visible" : "not visible"}, filter ${a.room.filterCondition.replace("_", " ")}${a.room.estimatedFloorAreaM2 ? `, floor area ~${a.room.estimatedFloorAreaM2} m² (visual estimate; confirm with the user)` : ""}.`,
   ];
   if (a.pollutionSources.length) parts.push(`Possible sources: ${a.pollutionSources.map((s) => `${s.name} (${s.kind})`).join(", ")}.`);

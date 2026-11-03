@@ -6,6 +6,7 @@ import { ApprovalRequestCard } from "../cards/ApprovalRequestCard";
 import { ToolResultCard, type ToolPartView } from "../cards/ToolResultCard";
 import { SceneCard } from "../cards/SceneCard";
 import { ReasoningTimeline } from "../judge/ReasoningTimeline";
+import { dedupeProfileAsks } from "@/lib/agent/profileAsk";
 
 export function NoticeCard({ notice, onRetry, busy }: { notice: NoticeData; onRetry?: () => void; busy?: boolean }) {
   return (
@@ -28,7 +29,9 @@ export function MessageBubble({
   onRetry,
   judge = false,
   onSendText,
+  profileAskedBefore = false,
 }: {
+  profileAskedBefore?: boolean;
   judge?: boolean;
   onSendText?: (text: string) => void;
   message: AgentUIMessage;
@@ -52,6 +55,16 @@ export function MessageBubble({
     );
   }
   const traces = message.parts.flatMap((p) => (p.type === "data-trace" ? [p.data] : []));
+  // One sensitivity-profile question per reply (Muse Spark may repeat it in each step).
+  const textIdx = message.parts.flatMap((p, i) => (p.type === "text" && !p.text.startsWith("**Monitoring update**") ? [i] : []));
+  const cleaned = dedupeProfileAsks(
+    textIdx.map((i) => {
+      const p = message.parts[i];
+      return p?.type === "text" ? p.text : "";
+    }),
+    { alreadyAsked: profileAskedBefore },
+  );
+  const textFor = new Map(textIdx.map((i, k) => [i, cleaned[k] ?? ""]));
   return (
     <article className="msg msg-assistant" aria-label="AirHealth Engineer replied">
       <div className="byline" aria-hidden="true">
@@ -61,11 +74,12 @@ export function MessageBubble({
       {message.parts.map((part, i) => {
         const key = `${message.id}-${i}`;
         if (part.type === "text") {
-          if (!part.text.trim()) return null;
+          const text = textFor.get(i) ?? part.text;
+          if (!text.trim()) return null;
           const monitor = part.text.startsWith("**Monitoring update**");
           return (
             <div key={key} className={`bubble md${monitor ? " monitor" : ""}`}>
-              <ReactMarkdown>{part.text}</ReactMarkdown>
+              <ReactMarkdown>{text}</ReactMarkdown>
             </div>
           );
         }

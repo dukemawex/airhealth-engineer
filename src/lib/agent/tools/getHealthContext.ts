@@ -53,7 +53,7 @@ export function assessHealth(profile: HealthProfile) {
   if (d.peakFlowLpm !== undefined && d.personalBestPeakFlowLpm) {
     const pct = Math.round((d.peakFlowLpm / d.personalBestPeakFlowLpm) * 100);
     if (pct < 50) redFlags.push(`peak flow ${pct}% of personal best (< 50%)`);
-    else if (pct < 80) cautions.push(`peak flow ${pct}% of personal best (50-80% zone)`);
+    else if (pct < 80) cautions.push(`peak flow ${pct}% of personal best (below 80%): use tighter air targets`);
   }
   if (d.indoorCo2Ppm !== undefined && d.indoorCo2Ppm > 1000) {
     cautions.push(`indoor CO2 ${d.indoorCo2Ppm} ppm (> 1000): needs fresh air, ideally filtered`);
@@ -62,7 +62,7 @@ export function assessHealth(profile: HealthProfile) {
     cautions.push(`indoor humidity ${d.indoorHumidityPercent}% outside 30-60%`);
   }
   for (const a of profile.activities ?? []) {
-    cautions.push(`regular outdoor exposure (${a}): time outdoor activity for the cleanest hours and lower exertion when air is poor`);
+    cautions.push(`regular outdoor exposure (${a}): schedule outdoor tasks in the cleanest hours`);
   }
   if (d.indoorPm25 !== undefined && d.indoorPm25 > 9) cautions.push(`indoor PM2.5 ${d.indoorPm25} µg/m³ (> 9)`);
 
@@ -82,7 +82,7 @@ export function assessHealth(profile: HealthProfile) {
 export const getHealthContextTool = defineTool({
   name: "getHealthContext",
   description:
-    "Record and assess the user's sensitivity profile (conditions, symptoms, age group, sensitive household members, outdoor activities, medications, recent vitals/indoor sensor data). Returns sensitivity, red-flag symptoms that need urgent medical care, and engineering thresholds. Call when the user shares health information or before designing an intervention.",
+    "Record and assess the user's sensitivity profile (conditions, symptoms, age group, sensitive household members, outdoor activities, medications, recent vitals/indoor sensor data). Returns how strict the air targets should be, any red flags that mean the user should contact a clinician first, and engineering thresholds. Call when the user shares health information or before designing an intervention.",
   schema: getHealthContextSchema,
   requiresApproval: false,
   async execute(args, ctx) {
@@ -93,7 +93,7 @@ export const getHealthContextTool = defineTool({
       profile,
       assessment: assessHealth(profile),
       disclaimer:
-        "Decision support only, not a diagnosis. If red flags are present, tell the user to seek urgent medical care before any engineering advice.",
+        "Sets air-engineering targets only, not medical advice. If red flags are present, tell the user to contact emergency services or a clinician first, then continue with air engineering only.",
     };
   },
 });

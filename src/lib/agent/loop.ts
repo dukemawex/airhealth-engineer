@@ -14,6 +14,7 @@ import { geocodeDepsFromConfig, resolveLocation } from "../services/geocode";
 import { decideNotification } from "./monitor";
 import { recordAirQuality } from "./sessionState";
 import { mergeProfile } from "./tools/getHealthContext";
+import { dedupeProfileAsks, previousReplyAsked } from "./profileAsk";
 import { withLock, type StateStore } from "../storage";
 import { buildDeveloperPrompt } from "./prompt";
 import { buildStatusReport } from "./status";
@@ -367,6 +368,27 @@ export class AgentRunner {
       model: this.deps.model,
     };
 
+    // One sensitivity-profile question per reply, none if the previous reply already asked.
+    const profileAskedBefore = previousReplyAsked(
+      session.messages.map((m) => ({ role: m.role, text: typeof m.content === "string" ? m.content : null })),
+      Boolean(session.profile),
+    );
+    // Blocks of the current reply, including any written before an approval pause.
+    const runAssistant: Array<{ content: unknown }> = [];
+    for (let i = session.messages.length - 1; i >= 0; i--) {
+      const m = session.messages[i];
+      if (!m || m.role === "user") break;
+      if (m.role === "assistant") runAssistant.unshift(m);
+    }
+    const cleanRunText = (): string | null => {
+      const texts = runAssistant.map((m) => (typeof m.content === "string" ? m.content : ""));
+      const cleaned = dedupeProfileAsks(texts, { alreadyAsked: profileAskedBefore });
+      runAssistant.forEach((m, k) => {
+        if (typeof m.content === "string" && m.content !== cleaned[k]) m.content = cleaned[k] ?? "";
+      });
+      return cleaned.at(-1) ?? null;
+    };
+
     const finish = async (status: RunStatus, reply: string | null, iterations: number): Promise<RunResult> => {
       session.status = "idle";
       await this.save(session);
@@ -421,11 +443,14 @@ export class AgentRunner {
             ? { role: "assistant", content: choice.message.content ?? null, tool_calls: calls }
             : { role: "assistant", content: choice.message.content ?? "" },
         );
+        const pushed = session.messages.at(-1);
+        if (pushed) runAssistant.push(pushed);
+        const stepReply = cleanRunText();
 
         if (calls.length === 0) {
           events?.onStepEnd?.(iteration);
           events?.onTrace?.(trace);
-          return await finish("completed", choice.message.content ?? "", iteration);
+          return await finish("completed", stepReply ?? "", iteration);
         }
 
         const results: Record<string, string> = {};
@@ -464,7 +489,7 @@ export class AgentRunner {
           return {
             sessionId: session.id,
             status: "awaiting_approval",
-            reply: choice.message.content ?? null,
+            reply: stepReply || null,
             iterations: iteration,
             toolCalls,
             pendingApprovals: approvals,

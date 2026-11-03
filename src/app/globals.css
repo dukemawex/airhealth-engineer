@@ -3415,3 +3415,11 @@ dialog.camera-sheet::backdrop {
     opacity: 0;
   }
 }
+
+.badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+  align-items: flex-start;
+}

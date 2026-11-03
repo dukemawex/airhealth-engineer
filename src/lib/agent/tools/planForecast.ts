@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { AppError } from "../../errors";
-import { FORECAST_PLAN_JSON_SCHEMA, ForecastPlanSchema, normalisePlan, plannerPrompt, rulesPlan, type ForecastPlan } from "../../forecast/plan";
+import { adaptPlanForSpace, FORECAST_PLAN_JSON_SCHEMA, ForecastPlanSchema, normalisePlan, plannerPrompt, rulesPlan, type ForecastPlan } from "../../forecast/plan";
 import { fetchForecast, forecastWindows } from "../../services/forecast";
+import { spaceFromSetting } from "../../space";
 import { defineTool } from "./types";
 
 export const planForecastSchema = z.object({
@@ -45,6 +46,7 @@ export const planForecastTool = defineTool({
       ? [p.ageGroup, ...(p.conditions ?? []), ...(p.household ?? []).map((h) => `household: ${h}`)].filter(Boolean).join(", ") || "general"
       : "general";
     const scene = ctx.session.scene?.analysis;
+    const space = spaceFromSetting(scene?.setting);
     const room = scene
       ? `${scene.summary} Windows ${scene.room.windows}, purifier ${scene.room.purifierVisible ? "visible" : "not visible"}, ~${scene.room.estimatedFloorAreaM2 ?? "?"} m²`
       : null;
@@ -56,14 +58,14 @@ export const planForecastTool = defineTool({
       if (!ctx.model) throw new Error("model client unavailable");
       const res = await ctx.model.createChatCompletion({
         messages: [
-          { role: "developer", content: plannerPrompt({ forecast, windows, sensitivity, devices, room, focus: args.focus }) },
+          { role: "developer", content: plannerPrompt({ forecast, windows, sensitivity, devices, room, focus: args.focus, space }) },
           { role: "user", content: "Build the plan as JSON." },
         ],
         reasoning_effort: PLANNER_EFFORT,
         response_format: { type: "json_schema", json_schema: { name: "forecast_plan", strict: true, schema: FORECAST_PLAN_JSON_SCHEMA as unknown as Record<string, unknown> } },
       });
       const raw = ForecastPlanSchema.parse(JSON.parse(res.choices[0]?.message.content ?? "{}"));
-      plan = normalisePlan(raw);
+      plan = adaptPlanForSpace(normalisePlan(raw), space);
       if (!plan.steps.length) throw new Error("planner returned no steps");
       planner = {
         kind: "muse-spark",
@@ -74,7 +76,7 @@ export const planForecastTool = defineTool({
       };
     } catch (err) {
       ctx.logger.warn("forecast planner fell back to rules", { error: err });
-      plan = rulesPlan(windows);
+      plan = rulesPlan(windows, undefined, undefined, space);
       planner = { kind: "rules-fallback", reason: err instanceof Error ? err.message.slice(0, 160) : "planner error" };
     }
     return {
@@ -88,6 +90,7 @@ export const planForecastTool = defineTool({
       windows,
       plan,
       planner,
+      space: space ?? "indoor",
       approvalNote: "Steps are proposals. Each device command runs only after the user approves it via executeDeviceAction.",
     };
   },
