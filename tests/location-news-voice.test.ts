@@ -212,3 +212,12 @@ describe("bluetooth encoding", () => {
     expect(JSON.parse(line)).toEqual({ type: "airhealth.command", approvalId: "apr_1", command: { action: "set_purifier", mode: "high" } });
   });
 });
+
+describe("place labels", () => {
+  it("deduplicates comma-separated segments across fields", async () => {
+    const { formatPlace } = await import("@/lib/place");
+    expect(
+      formatPlace({ name: "Oja Tuntun, Oko Erin, Nigeria", admin1: "Kwara State", country: "Nigeria", latitude: 8.5, longitude: 4.5 }),
+    ).toBe("Oja Tuntun, Oko Erin, Nigeria, Kwara State");
+  });
+});

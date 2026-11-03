@@ -212,13 +212,21 @@ async function searchOpenMeteo(name: string, countryCode: string | undefined, de
 
 function fromNominatim(p: z.infer<typeof NominatimPlace>): Omit<ResolvedLocation, "source"> {
   const a = p.address ?? {};
-  const city = a.city ?? a.town ?? a.village ?? a.municipality ?? a.county ?? a.state_district;
+  // Some OSM names embed the country ("Oja Tuntun, Oko Erin, Nigeria"); drop that suffix.
+  const clean = (v?: string) => {
+    if (!v || !a.country) return v;
+    const parts = v.split(",").map((x) => x.trim());
+    const country = a.country.toLowerCase();
+    while (parts.length > 1 && parts[parts.length - 1]?.toLowerCase() === country) parts.pop();
+    return parts.join(", ");
+  };
+  const city = clean(a.city ?? a.town ?? a.village ?? a.municipality ?? a.county ?? a.state_district);
   const area = a.suburb ?? a.neighbourhood ?? a.quarter ?? a.city_district;
   return {
     latitude: p.lat,
     longitude: p.lon,
     area: area && area !== city ? area : undefined,
-    name: city ?? p.name ?? p.display_name?.split(",")[0]?.trim(),
+    name: city ?? clean(p.name) ?? p.display_name?.split(",")[0]?.trim(),
     admin1: a.state ?? a.region,
     country: a.country,
     countryCode: a.country_code?.toUpperCase(),
