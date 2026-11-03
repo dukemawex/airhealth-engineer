@@ -15,6 +15,8 @@
 
 Every model call goes to **Meta models only** (the Meta Model API, `https://api.meta.ai/v1`): Muse Spark, SAM 3.1, Muse Voice Transcribe and Muse Image. Each endpoint has a capability check and an honest fallback.
 
+> **For judges:** the live demo at https://airhealth-engineer.vercel.app is protected by an access token to cap Meta Model API costs. The token is in the hackathon submission form. Enter it when the app asks. Device actions run in the sandbox.
+
 > Not medical advice. The agent controls environment and devices: exposure, filtration and ventilation. Your optional **sensitivity profile** only tunes device thresholds. It doesn't diagnose or prescribe. Seek urgent care for severe symptoms.
 
 ![Studio home, dark](docs/screenshots/empty-desktop.png)
