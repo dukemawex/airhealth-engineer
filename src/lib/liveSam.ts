@@ -147,6 +147,18 @@ export function iou(a: Box, b: Box): number {
  * Drop weak matches and cross-concept duplicates: SAM answers each phrase
  * independently, so a purifier can also come back (weaker) as "air conditioner".
  */
+/** Pairs SAM mixes up: a loose box from one inside a tight box of the other is the same object. */
+const CONFUSABLE = [["air purifier", "air conditioner"]];
+const confusable = (a: string, b: string) => CONFUSABLE.some(([x, y]) => (a === x && b === y) || (a === y && b === x));
+/** Intersection over the smaller box. */
+export function containment(a: Box, b: Box): number {
+  const ix = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+  const iy = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+  const area = (r: Box) => Math.max(0, r.right - r.left) * Math.max(0, r.bottom - r.top);
+  const m = Math.min(area(a), area(b));
+  return m > 0 ? (ix * iy) / m : 0;
+}
+
 const DEDUPE_PRIORITY: Record<string, number> = { "air purifier": 1 };
 
 export function cleanRegions<R extends LiveRegion>(regions: R[]): R[] {
@@ -156,7 +168,7 @@ export function cleanRegions<R extends LiveRegion>(regions: R[]): R[] {
   strong.sort((a, b) => (DEDUPE_PRIORITY[b.concept] ?? 0) - (DEDUPE_PRIORITY[a.concept] ?? 0) || (b.confidence ?? 0) - (a.confidence ?? 0));
   const kept: R[] = [];
   for (const r of strong) {
-    if (kept.some((k) => k.concept !== r.concept && iou(k.box, r.box) > 0.6)) continue;
+    if (kept.some((k) => k.concept !== r.concept && (iou(k.box, r.box) > 0.6 || (confusable(k.concept, r.concept) && containment(k.box, r.box) > 0.5)))) continue;
     kept.push(r);
   }
   return kept;

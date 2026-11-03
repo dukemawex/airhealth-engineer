@@ -81,6 +81,9 @@ describe("mask-derived state", () => {
       region("air conditioner", [331, 20, 401, 66], 0.95),
       region("smoke", [0, 0, 10, 10], 0.2),
     ]);
+    // A shifted, looser AC box over the purifier is still the purifier; smoke inside a window is kept.
+    const shifted = cleanRegions([region("air purifier", [314, 188, 352, 269], 0.7), region("air conditioner", [300, 180, 352, 275], 0.9), region("window", [100, 50, 300, 250], 0.9), region("smoke", [150, 80, 200, 200], 0.8)]);
+    expect(shifted.map((r) => r.concept).sort()).toEqual(["air purifier", "smoke", "window"]);
     expect(kept.map((r) => `${r.concept} ${r.confidence}`)).toEqual(["air purifier 0.63", "air conditioner 0.95"]);
   });
 

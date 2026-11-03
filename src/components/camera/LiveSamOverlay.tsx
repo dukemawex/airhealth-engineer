@@ -195,7 +195,14 @@ export function LiveSamOverlay({
         if (r.source === "sam-3.1") {
           fallback = false;
           const asked = new Set(r.concepts);
-          regions = cleanRegions([...r.regions.map(fresh), ...regions.filter((x) => x.source === "sam-3.1" && !asked.has(x.concept))]);
+          {
+            // Fresh masks plus the still-tracked ones from earlier keyframes; drop cross-concept duplicates
+            // using where the older ones have moved to (dx/dy are in grey-frame px).
+            const merged = [...r.regions.map(fresh), ...regions.filter((x) => x.source === "sam-3.1" && !asked.has(x.concept))];
+            const at = (x: Tracked) => ({ ...x, box: { left: x.box.left + x.dx / toGrey, right: x.box.right + x.dx / toGrey, top: x.box.top + x.dy / toGrey, bottom: x.box.bottom + x.dy / toGrey } });
+            const keep = new Set(cleanRegions(merged.map(at)).map((x) => x.id));
+            regions = merged.filter((x) => keep.has(x.id));
+          }
           for (const c of r.concepts) segmented.add(c);
           // Catch up with motion that happened while SAM was working.
           const cur = readGrey(v);
