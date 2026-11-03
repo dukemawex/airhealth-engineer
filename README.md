@@ -148,6 +148,7 @@ Everything in this repo was built during the hackathon. The first commit was on 
 | WhatsApp share on the air card: prefilled `wa.me` text plus the native share sheet with the card image | `8b817c2` | 2026-11-03 08:13 |
 | Live camera mode: frame-diff change detection, scene re-read only on change, plan updates, cost guard | `fc6f193` | 2026-11-03 08:20 |
 | Smart plug control: Shelly local RPC, Shelly Cloud and Home Assistant switch behind the approval gate, no-plug sandbox state | `7bd9bf7` | 2026-11-03 08:26 |
+| Location dead-end fix: Share-my-location card (device or city) that resumes the turn, "use my location" intent, respiratory symptoms join the sensitive group, preamble dedupe, best outdoor window from the 72-h forecast ([screens](docs/screenshots/)) | `8022f95` | 2026-11-03 09:06 |
 
 The 3-minute demo script is in [docs/demo-script.md](docs/demo-script.md).
 
