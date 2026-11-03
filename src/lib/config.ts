@@ -168,7 +168,7 @@ export function parseConfig(env: Record<string, string | undefined> = process.en
       reasoningEffort: e.META_REASONING_EFFORT,
       // One call per turn keeps approval pauses simple to reason about; the loop
       // still handles parallel calls correctly if you enable them.
-      parallelToolCalls: e.META_PARALLEL_TOOL_CALLS ?? false,
+      parallelToolCalls: e.META_PARALLEL_TOOL_CALLS ?? true,
       timeoutMs: e.META_TIMEOUT_MS,
       maxRetries: e.META_MAX_RETRIES,
     },

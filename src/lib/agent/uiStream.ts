@@ -82,7 +82,10 @@ class StreamBridge implements RunEvents {
   onToolResult(r: { id: string; name: string; ok: boolean; output: unknown }) {
     this.w.write({ type: "tool-output-available", toolCallId: r.id, output: r.output, dynamic: true });
   }
-  onApprovalRequested(a: Approval) {
+  onToolProgress(p: { id: string; name: string; message: string }) {
+    this.w.write({ type: "data-progress", id: `progress_${p.id}`, data: { toolCallId: p.id, tool: p.name, message: p.message } });
+  }
+    onApprovalRequested(a: Approval) {
     this.w.write({ type: "data-approval", id: a.id, data: toApprovalView(a) });
   }
   onApprovalDecided(a: Approval, toolResult: Record<string, unknown>) {

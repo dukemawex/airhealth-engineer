@@ -13,6 +13,16 @@ export class MemoryStateStore implements StateStore {
   private devices = new Map<string, Map<string, DeviceState>>();
   private monitored = new Set<string>();
   private locks = new Map<string, { token: string; expiresAt: number }>();
+  private cache = new Map<string, { value: unknown; expiresAt: number }>();
+
+  async getCache<T>(key: string) {
+    const hit = this.cache.get(key);
+    if (!hit || hit.expiresAt < Date.now()) return null;
+    return clone(hit.value) as T;
+  }
+  async putCache(key: string, value: unknown, ttlSeconds: number) {
+    this.cache.set(key, { value: clone(value), expiresAt: Date.now() + ttlSeconds * 1000 });
+  }
 
   async getSession(id: string) {
     const s = this.sessions.get(id);

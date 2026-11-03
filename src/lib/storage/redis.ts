@@ -49,6 +49,13 @@ export class RedisStateStore implements StateStore {
     return items.filter((x): x is Awaited<T> => x !== null).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }
 
+  getCache<T>(key: string) {
+    return this.getJson<T>(this.k("cache", key));
+  }
+  async putCache(key: string, value: unknown, ttlSeconds: number) {
+    await this.redis.set(this.k("cache", key), JSON.stringify(value), { ex: Math.max(1, Math.round(ttlSeconds)) });
+  }
+
   getSession(id: string) {
     return this.getJson<Session>(this.k("session", id));
   }

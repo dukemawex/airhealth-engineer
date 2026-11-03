@@ -44,6 +44,8 @@ export type AgentDataParts = {
   conversation: { id: string };
   notice: NoticeData;
   run: RunData;
+  /** Live progress line for a running tool; reconciled by id `progress_<toolCallId>`. */
+  progress: { toolCallId: string; tool: string; message: string };
 };
 
 /** Client-side metadata on user turns (a photo shared with that message). Never persisted server-side. */

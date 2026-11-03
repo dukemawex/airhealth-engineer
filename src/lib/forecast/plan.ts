@@ -52,7 +52,7 @@ export const FORECAST_PLAN_JSON_SCHEMA = {
     headline: str("One sentence: what the next 72 hours look like and the overall control strategy."),
     steps: {
       type: "array",
-      description: "3-8 chronological steps covering the forecast; merge quiet periods.",
+      description: "3-5 chronological steps covering the forecast; merge quiet periods.",
       items: {
         type: "object",
         additionalProperties: false,
@@ -61,7 +61,7 @@ export const FORECAST_PLAN_JSON_SCHEMA = {
           startLocal: str("Local time YYYY-MM-DDTHH:00 copied from the forecast windows."),
           endLocal: str("Local time YYYY-MM-DDTHH:00."),
           title: str("Short imperative, e.g. 'Seal the bedroom and run the purifier high'."),
-          why: str("Cite the forecast numbers that justify the step."),
+          why: str("One short clause (max 120 characters) citing the forecast numbers."),
           risk: { type: "string", enum: [...RISK_LEVELS] },
           device: {
             type: "object",
@@ -140,6 +140,8 @@ export function plannerPrompt(input: {
   room: string | null;
   focus?: string;
   space?: SpaceType;
+  /** Deterministic best outdoor window (already computed in code); the plan must not contradict it. */
+  outdoorWindow?: string | null;
 }): string {
   return [
     "You are the planning module of AirHealth Engineer, an agent that engineers indoor air by controlling purifiers, HVAC and windows to reduce exposure.",
@@ -154,7 +156,10 @@ export function plannerPrompt(input: {
       : "",
     "CAMS forecast in 6-hour windows (PM2.5 µg/m³, US AQI):",
     JSON.stringify(input.windows),
-    "Write 3-8 chronological steps that cover the forecast. Pre-empt peaks (start filtration 1-2 h before), open windows only in the cleanest windows, and keep purifier noise low overnight unless air is bad.",
+    input.outdoorWindow
+      ? `Best outdoor window (computed from the hourly series; do NOT change it): ${input.outdoorWindow}. Any exercise/outdoor/ventilation advice must use exactly this window.`
+      : "",
+    "Be brief. Write 3-5 chronological steps that cover the forecast. Pre-empt peaks (start filtration 1-2 h before), open windows only in the cleanest windows, and keep purifier noise low overnight unless air is bad.",
     "Each step's 'why' must cite the forecast numbers. Use deviceType 'none' for behaviour-only steps (e.g. postpone outdoor exercise).",
   ]
     .filter(Boolean)
@@ -216,4 +221,77 @@ export function rulesPlan(
     };
   });
   return { headline: "Rule-based plan from the live CAMS forecast (Muse Spark planner unavailable).", steps };
+}
+
+/**
+ * Speed path: the timeline (times, risk, device commands) is computed in code by rulesPlan,
+ * and Muse Spark only rewrites the wording. The output is tiny, so it returns in seconds.
+ */
+export const PLAN_PHRASING_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["headline", "steps"],
+  properties: {
+    headline: { type: "string", description: "One sentence, max 110 characters, about the next 72 h for this person." },
+    steps: {
+      type: "array",
+      description: "One entry per given step id, same order.",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "title", "why"],
+        properties: {
+          id: { type: "string" },
+          title: { type: "string", description: "Imperative, max 48 characters." },
+          why: { type: "string", description: "One short clause, max 110 characters, citing the PM2.5 figure." },
+        },
+      },
+    },
+  },
+} as const;
+
+export const PlanPhrasingSchema = z.object({
+  headline: z.string(),
+  steps: z.array(z.object({ id: z.string(), title: z.string(), why: z.string() })),
+});
+export type PlanPhrasing = z.infer<typeof PlanPhrasingSchema>;
+
+export function phrasingPrompt(input: {
+  place: string;
+  plan: ForecastPlan;
+  sensitivity: string;
+  room: string | null;
+  focus?: string;
+  space?: SpaceType;
+  outdoorWindow?: string;
+}): string {
+  const steps = input.plan.steps.map((s) => ({
+    id: s.id,
+    from: s.startLocal,
+    to: s.endLocal,
+    risk: s.risk,
+    facts: s.why,
+    device: s.command ? `${s.command.action} ${s.command.deviceId}` : "none",
+  }));
+  return [
+    "You phrase an indoor-air timeline for AirHealth Engineer. The times, risk levels and device actions are FIXED (computed from the CAMS forecast); never change, add or drop steps. Never give medical advice.",
+    `Place: ${input.place}. Person: ${input.sensitivity}.${input.room ? ` Room: ${input.room}.` : ""}${input.space && isOpenSpace(input.space) ? " Open-air space: no purifier or windows." : ""}${input.focus ? ` Focus: ${input.focus}.` : ""}`,
+    input.outdoorWindow ? `Best outdoor window (computed; mention exactly this if relevant): ${input.outdoorWindow}` : "",
+    `Steps: ${JSON.stringify(steps)}`,
+    "Return JSON: a headline and, for each id, a short title and why. Be brief.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+export function applyPhrasing(plan: ForecastPlan, ph: PlanPhrasing): ForecastPlan {
+  const byId = new Map(ph.steps.map((s) => [s.id, s]));
+  const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
+  return {
+    headline: ph.headline.trim() ? clip(ph.headline.trim(), 140) : plan.headline,
+    steps: plan.steps.map((s) => {
+      const p = byId.get(s.id);
+      return p ? { ...s, title: clip(p.title.trim() || s.title, 60), why: clip(p.why.trim() || s.why, 140) } : s;
+    }),
+  };
 }

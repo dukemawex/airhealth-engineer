@@ -38,7 +38,7 @@ describe("MetaModelClient", () => {
     expect(url).toBe("https://api.meta.ai/v1/chat/completions");
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer LLM_secret");
     const body = JSON.parse(init.body as string);
-    expect(body).toMatchObject({ model: "muse-spark-1.3", tool_choice: "auto", parallel_tool_calls: false, reasoning_effort: "low" });
+    expect(body).toMatchObject({ model: "muse-spark-1.3", tool_choice: "auto", parallel_tool_calls: true, reasoning_effort: "low" });
   });
 
   it("retries 429 honoring Retry-After, then succeeds", async () => {

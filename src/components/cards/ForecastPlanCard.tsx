@@ -10,7 +10,11 @@ export interface ForecastPlanOutput {
     headline: string;
     steps: Array<{ id: string; startLocal: string; endLocal: string; title: string; why: string; risk: "low" | "moderate" | "high" | "very_high"; command: DeviceCommand | null }>;
   };
-  planner: { kind: "muse-spark"; model: string; reasoningEffort: string; ms: number; reasoningTokens: number | null } | { kind: "rules-fallback"; reason: string };
+  planner: { kind: "muse-spark"; model: string; reasoningEffort: string; ms: number; reasoningTokens: number | null; cached?: boolean } | { kind: "rules-fallback"; reason: string };
+  outdoorWindow?: { summary: string; withinThreshold: boolean } | null;
+  outdoorWindowChange?: { previous: string; why: string };
+  outdoorWindowBasis?: { durationMinutes: number; thresholdPm25: number };
+  timing?: { totalMs: number; forecastCache?: "hit" | "miss" };
 }
 
 const RISK_LABEL = { low: "Low", moderate: "Moderate", high: "High", very_high: "Very high" } as const;
@@ -88,6 +92,17 @@ export function ForecastPlanCard({ output, onApplyStep, busy }: { output: Foreca
           {planner.kind === "muse-spark" ? `Muse Spark · ${planner.reasoningEffort}` : "Rules fallback"}
         </span>
       </div>
+      {output.outdoorWindow && (
+        <div className="fc-best" data-ok={output.outdoorWindow.withinThreshold ? "true" : "false"}>
+          <strong>{output.outdoorWindow.summary}</strong>
+          {output.outdoorWindowBasis && (
+            <span className="fc-best-basis">
+              {output.outdoorWindowBasis.durationMinutes} min outing · threshold {output.outdoorWindowBasis.thresholdPm25} µg/m³ · computed from the hourly forecast
+            </span>
+          )}
+          {output.outdoorWindowChange && <span className="fc-best-basis">Earlier: {output.outdoorWindowChange.previous.replace(/^Best window: /, "")}. {output.outdoorWindowChange.why}</span>}
+        </div>
+      )}
       {forecast.hours.length > 1 && <Chart hours={forecast.hours} steps={plan.steps} />}
       <ol className="fc-steps">
         {plan.steps.map((s) => (

@@ -33,6 +33,10 @@ export interface StateStore {
   acquireLock(key: string, ttlMs: number): Promise<string | null>;
   releaseLock(key: string, token: string): Promise<void>;
 
+  /** Short-lived JSON cache (forecast per rounded location/hour, plan text). Optional for test doubles. */
+  getCache?<T>(key: string): Promise<T | null>;
+  putCache?(key: string, value: unknown, ttlSeconds: number): Promise<void>;
+
   /** Connectivity check for /api/health. */
   ping(): Promise<boolean>;
 }

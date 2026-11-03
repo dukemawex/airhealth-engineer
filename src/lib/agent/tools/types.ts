@@ -19,6 +19,8 @@ export interface ToolContext {
   httpTimeoutMs: number;
   /** Muse Spark client for tools that plan with the model (optional in tests). */
   model?: ModelClient;
+  /** Stream a short progress line to the UI while this tool runs. */
+  progress?: (message: string) => void;
 }
 
 export interface AgentTool<S extends z.ZodType = z.ZodType> {

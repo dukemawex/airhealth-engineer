@@ -100,6 +100,8 @@ function AssistantBubble({
   const textFor = new Map(textIdx.map((i, k) => [i, cleaned[k] ?? ""]));
   // One Share-my-location card per reply (requestLocation and a needsLocation result may both fire).
   const firstLocCard = message.parts.findIndex((p) => p.type === "dynamic-tool" && isLocationRequestPart(p as unknown as ToolPartView));
+  const progressFor = new Map<string, string>();
+  for (const p of message.parts) if (p.type === "data-progress") progressFor.set(p.data.toolCallId, p.data.message);
   const fallbackLocCard =
     firstLocCard < 0 && isLast && !busy && Boolean(loc && !loc.known) && cleaned.some((t) => ASKS_FOR_PLACE.test(t));
   return (
@@ -122,7 +124,8 @@ function AssistantBubble({
         }
         if (part.type === "dynamic-tool") {
           if (i !== firstLocCard && isLocationRequestPart(part as unknown as ToolPartView)) return null;
-          return <ToolResultCard key={key} part={part as unknown as ToolPartView} history={history} onApplyStep={onSendText} busy={busy} />;
+          const view = { ...(part as unknown as ToolPartView), progress: progressFor.get(part.toolCallId) };
+          return <ToolResultCard key={key} part={view} history={history} onApplyStep={onSendText} busy={busy} />;
         }
         if (part.type === "data-approval") {
           return <ApprovalRequestCard key={key} approval={part.data} onReview={onReviewApproval} busy={busy} />;

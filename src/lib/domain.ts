@@ -353,6 +353,28 @@ export interface Session {
   scene?: SessionScene;
   /** Smart plug set in the Devices panel (server-side only; never returned to the client). */
   plug?: PlugSettings;
+  /** Best outdoor window computed for a forecast hour; reused so replies stay consistent. */
+  outdoorWindow?: StoredOutdoorWindow;
+}
+
+export interface StoredOutdoorWindow {
+  /** Local hour the forecast series starts at ("2026-11-03T09:00"). */
+  forecastHour: string;
+  /** Rounded location key ("8.50,4.54"). */
+  locationKey: string;
+  durationMinutes: number;
+  thresholdPm25: number;
+  computedAt: string;
+  window: {
+    startLocal: string;
+    endLocal: string;
+    day: string;
+    avgPm25: number;
+    maxPm25: number;
+    thresholdPm25: number;
+    withinThreshold: boolean;
+    summary: string;
+  } | null;
 }
 
 export const SessionSceneSchema = z.object({

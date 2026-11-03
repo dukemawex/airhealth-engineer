@@ -97,20 +97,20 @@ describe("planForecast tool", () => {
       getDeviceAdapter: () => ({ name: "sandbox", execute: async () => ({}), getStates: async () => [] }),
     }) as never;
 
-  it("plans with Muse Spark json_schema and never executes devices", async () => {
-    const plan = {
-      headline: "Two night peaks",
-      steps: [{ startLocal: "2026-11-03T18:00", endLocal: "2026-11-04T03:00", title: "Seal and filter", why: "PM2.5 54", risk: "high", device: { deviceType: "air_purifier", deviceId: "fan.bedroom_purifier", action: "set_fan_speed", level: 100, mode: null } }],
-    };
-    const model = new ScriptedModel([reply(JSON.stringify(plan))]);
-    const out = (await planForecastTool.execute!({ horizonHours: 72 }, ctx(model))) as { planner: { kind: string }; plan: { steps: Array<{ command: unknown }> }; forecast: { hours: unknown[] } };
+  it("computes the timeline in code, lets Muse Spark only phrase it, and never executes devices", async () => {
+    const phrasing = { headline: "Two smoky night peaks", steps: [{ id: "step_1", title: "Seal and filter", why: "PM2.5 54 tonight" }] };
+    const model = new ScriptedModel([reply(JSON.stringify(phrasing))]);
+    const out = (await planForecastTool.execute!({ horizonHours: 72 }, ctx(model))) as { planner: { kind: string }; plan: { headline: string; steps: Array<{ title: string; command: unknown }> }; forecast: { hours: unknown[] } };
     expect(out.planner.kind).toBe("muse-spark");
-    expect(out.plan.steps[0]!.command).toMatchObject({ fanSpeedPercent: 100 });
+    expect(out.plan.headline).toBe("Two smoky night peaks");
+    expect(out.plan.steps[0]!.title).toBe("Seal and filter");
+    expect(out.plan.steps.some((s) => s.command)).toBe(true);
     expect(out.forecast.hours.length).toBeGreaterThan(0);
     const req = model.requests[0]!;
     expect(req.response_format?.type).toBe("json_schema");
     expect(req.response_format?.json_schema.strict).toBe(true);
     expect(String(req.messages[0]!.content)).toMatch(/never give medical advice/i);
+    expect(String(req.messages[0]!.content)).toMatch(/FIXED/);
     expect(planForecastTool.requiresApproval).toBe(false);
   });
 

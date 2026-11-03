@@ -3523,3 +3523,8 @@ dialog.camera-sheet::backdrop {
 .loc-help span { opacity: 0.9; }
 .loc-done { margin: 0; font-size: var(--text-sm, 0.875rem); color: var(--color-ok, inherit); }
 .loc-card[data-done="true"] { padding-block: 10px; }
+
+/* Deterministic best outdoor window on the forecast card. */
+.fc-best { display: grid; gap: 2px; margin: 8px 0 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--color-ok, #2bd4a4) 40%, transparent); background: color-mix(in srgb, var(--color-ok, #2bd4a4) 10%, transparent); }
+.fc-best[data-ok="false"] { border-color: color-mix(in srgb, var(--color-warn, #e0a83a) 45%, transparent); background: color-mix(in srgb, var(--color-warn, #e0a83a) 10%, transparent); }
+.fc-best-basis { font-size: var(--text-xs, 0.75rem); opacity: 0.8; }

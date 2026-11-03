@@ -16,6 +16,8 @@ export interface ToolPartView {
   input?: unknown;
   output?: unknown;
   errorText?: string;
+  /** Latest streamed progress line while the tool runs. */
+  progress?: string;
 }
 
 const TOOL_LABEL: Record<string, string> = {
@@ -35,16 +37,16 @@ export function isLocationRequestPart(part: Pick<ToolPartView, "toolName" | "sta
   return part.state === "output-available" && Boolean(o && o.needsLocation === true);
 }
 
-function Pending({ name }: { name: string }) {
+function Pending({ name, progress }: { name: string; progress?: string }) {
   return (
-    <div className="card" aria-busy="true">
+    <div className="card" aria-busy="true" aria-live="polite">
       <div className="loading">
         <span className="typing" aria-hidden="true">
           <span />
           <span />
           <span />
         </span>
-        {TOOL_LABEL[name] ?? `Running ${name}`}…
+        {progress ?? `${TOOL_LABEL[name] ?? `Running ${name}`}…`}
       </div>
       <div className="skeleton" style={{ width: "70%" }} />
     </div>
@@ -84,7 +86,7 @@ export function ToolResultCard({
     if (output?.alreadyKnown) return null;
     return <LocationRequestCard reason={typeof output?.reason === "string" ? output.reason : undefined} />;
   }
-  if (state !== "output-available") return <Pending name={toolName} />;
+  if (state !== "output-available") return <Pending name={toolName} progress={part.progress} />;
   // "No location yet" is not a failure: show the friendly location card instead of "Not available".
   if (output?.needsLocation === true) return <LocationRequestCard />;
   if (output && typeof output.error === "string") return <ErrorCard name={toolName} message={output.error} />;

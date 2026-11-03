@@ -63,6 +63,8 @@ export interface RunEvents {
   onStepEnd?(iteration: number): void;
   onToolCall?(call: { id: string; name: string; input: unknown }): void;
   onToolResult?(result: { id: string; name: string; ok: boolean; output: unknown }): void;
+  /** Short progress line from a running tool ("Reading 72 h forecast…"). */
+  onToolProgress?(progress: { id: string; name: string; message: string }): void;
   onApprovalRequested?(approval: Approval): void;
   onApprovalDecided?(approval: Approval, toolResult: Record<string, unknown>): void;
   /** Per-step telemetry (model latency, token usage incl. reasoning tokens, tool timings). */
@@ -514,14 +516,35 @@ export class AgentRunner {
 
         const results: Record<string, string> = {};
         const approvals: Approval[] = [];
+        // Independent read-only tools in one step (e.g. getAirQuality + planForecast) run
+        // concurrently; any step with an approval-gated tool stays strictly sequential.
+        const parallel = calls.length > 1 && calls.every((c) => {
+          const t = this.tools.get(c.function.name);
+          return Boolean(t && !t.requiresApproval);
+        });
+        const callCtx = (call: ToolCall): ToolContext => ({
+          ...ctx,
+          progress: (message: string) => events?.onToolProgress?.({ id: call.id, name: call.function.name, message }),
+        });
+        const toolStart: Record<string, number> = {};
+        const prefetched = new Map<string, Promise<ToolOutcome>>();
+        if (parallel) {
+          for (const call of calls) {
+            events?.onToolCall?.({ id: call.id, name: call.function.name, input: parseJsonOr(call.function.arguments || "{}") });
+            toolStart[call.id] = Date.now();
+            prefetched.set(call.id, this.handleToolCall(call, callCtx(call)));
+          }
+        }
         for (const call of calls) {
-          events?.onToolCall?.({ id: call.id, name: call.function.name, input: parseJsonOr(call.function.arguments || "{}") });
-          const toolStarted = Date.now();
-          const outcome = await this.handleToolCall(call, ctx);
+          if (!parallel) {
+            events?.onToolCall?.({ id: call.id, name: call.function.name, input: parseJsonOr(call.function.arguments || "{}") });
+            toolStart[call.id] = Date.now();
+          }
+          const outcome = await (prefetched.get(call.id) ?? this.handleToolCall(call, callCtx(call)));
           trace.tools.push({
             id: call.id,
             name: call.function.name,
-            ms: Date.now() - toolStarted,
+            ms: Date.now() - toolStart[call.id]!,
             status: outcome.kind === "approval" ? "pending_approval" : outcome.ok ? "ok" : "error",
           });
           if (outcome.kind === "approval") {
