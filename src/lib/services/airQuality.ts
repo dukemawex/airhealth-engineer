@@ -11,7 +11,8 @@ import { haversineKm, pm25Category } from "./aqi";
  * Open-Meteo / CAMS modelled fallback where no station is in range.
  *
  * OpenAQ v3 (X-API-Key header):
- *   GET /v3/locations?coordinates={lat},{lon}&radius={m<=25000}&limit=N
+ *   GET /v3/locations?coordinates={lat},{lon}&radius={m<=25000}&limit=1000
+ *   GET /v3/locations?bbox={minLon},{minLat},{maxLon},{maxLat}&limit=1000  (widening beyond 25 km)
  *   GET /v3/locations/{id}/latest
  *   Docs: https://docs.openaq.org/using-the-api/geospatial
  *         https://docs.openaq.org/api/operations/location_latest_get_v3_locations__locations_id__latest_get
@@ -102,6 +103,75 @@ function normaliseParam(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, "").replace(/^pm2(\d)$/, "pm2$1");
 }
 
+const RECENT_MS = 7 * 86_400_000;
+/** OpenAQ caps `radius` at 25 km; beyond that we search a bounding box and cap by computed distance. */
+const OPENAQ_MAX_RADIUS_M = 25_000;
+export const WIDEST_SEARCH_KM = 100;
+
+type OpenAqLocation = z.infer<typeof OpenAqLocations>["results"][number];
+type RankedStation = OpenAqLocation & { distanceKm: number; lastMs: number };
+
+/** Prefer stations that reported in the last 7 days, then nearest first (by our own haversine distance). */
+export function rankStations(loc: { latitude: number; longitude: number }, stations: OpenAqLocation[], maxKm: number, now = Date.now()): RankedStation[] {
+  return stations
+    .filter((l) => l.coordinates.latitude !== null && l.coordinates.longitude !== null)
+    .map((l) => ({
+      ...l,
+      distanceKm: haversineKm(loc.latitude, loc.longitude, l.coordinates.latitude!, l.coordinates.longitude!),
+      lastMs: l.datetimeLast ? Date.parse(l.datetimeLast.utc) : 0,
+    }))
+    .filter((l) => l.distanceKm <= maxKm)
+    .sort((a, b) => {
+      const recentA = now - a.lastMs < RECENT_MS ? 0 : 1;
+      const recentB = now - b.lastMs < RECENT_MS ? 0 : 1;
+      return recentA - recentB || a.distanceKm - b.distanceKm;
+    });
+}
+
+/**
+ * Search rings: the requested radius, then OpenAQ's 25 km maximum, then a ~100 km bounding box.
+ * We stop at the first ring with a station that reported in the last week. `limit=1000` because
+ * OpenAQ does not order results by distance, so a small page can miss the nearest station.
+ */
+async function findStations(
+  loc: ResolvedLocation,
+  radiusMeters: number,
+  deps: AirQualityDeps,
+  headers: Record<string, string>,
+): Promise<{ ranked: RankedStation[]; searchRadiusKm: number }> {
+  const radii = [...new Set([Math.min(radiusMeters, OPENAQ_MAX_RADIUS_M), OPENAQ_MAX_RADIUS_M])];
+  let fallback: { ranked: RankedStation[]; searchRadiusKm: number } | null = null;
+  const rings: Array<{ km: number; url: URL }> = radii.map((r) => {
+    const url = new URL(`${deps.openaqBaseUrl}/locations`);
+    url.searchParams.set("coordinates", `${loc.latitude.toFixed(4)},${loc.longitude.toFixed(4)}`);
+    url.searchParams.set("radius", String(r));
+    url.searchParams.set("limit", "1000");
+    return { km: r / 1000, url };
+  });
+  {
+    const dLat = WIDEST_SEARCH_KM / 111;
+    const dLon = WIDEST_SEARCH_KM / (111 * Math.max(0.1, Math.cos((loc.latitude * Math.PI) / 180)));
+    const clamp = (v: number, m: number) => Math.max(-m, Math.min(m, v));
+    const url = new URL(`${deps.openaqBaseUrl}/locations`);
+    url.searchParams.set(
+      "bbox",
+      [clamp(loc.longitude - dLon, 180), clamp(loc.latitude - dLat, 90), clamp(loc.longitude + dLon, 180), clamp(loc.latitude + dLat, 90)]
+        .map((n) => n.toFixed(4))
+        .join(","),
+    );
+    url.searchParams.set("limit", "1000");
+    rings.push({ km: WIDEST_SEARCH_KM, url });
+  }
+  for (const ring of rings) {
+    const stations = OpenAqLocations.parse(await getJson(deps, "openaq", ring.url, headers)).results;
+    const ranked = rankStations(loc, stations, ring.km);
+    if (ranked.length === 0) continue;
+    if (Date.now() - ranked[0]!.lastMs < RECENT_MS) return { ranked, searchRadiusKm: ring.km };
+    fallback ??= { ranked, searchRadiusKm: ring.km };
+  }
+  return fallback ?? { ranked: [], searchRadiusKm: WIDEST_SEARCH_KM };
+}
+
 async function fromOpenAq(
   loc: ResolvedLocation,
   radiusMeters: number,
@@ -109,26 +179,8 @@ async function fromOpenAq(
 ): Promise<AirQualitySnapshot | null> {
   if (!deps.openaqApiKey) return null;
   const headers = { "X-API-Key": deps.openaqApiKey, Accept: "application/json" };
-  const url = new URL(`${deps.openaqBaseUrl}/locations`);
-  url.searchParams.set("coordinates", `${loc.latitude.toFixed(4)},${loc.longitude.toFixed(4)}`);
-  url.searchParams.set("radius", String(radiusMeters));
-  url.searchParams.set("limit", "50");
-  const locations = OpenAqLocations.parse(await getJson(deps, "openaq", url, headers)).results;
-
-  const ranked = locations
-    .filter((l) => l.coordinates.latitude !== null && l.coordinates.longitude !== null)
-    .map((l) => ({
-      ...l,
-      distanceKm: haversineKm(loc.latitude, loc.longitude, l.coordinates.latitude!, l.coordinates.longitude!),
-      lastMs: l.datetimeLast ? Date.parse(l.datetimeLast.utc) : 0,
-    }))
-    // Prefer stations that reported in the last 7 days, then nearest first.
-    .sort((a, b) => {
-      const recentA = Date.now() - a.lastMs < 7 * 86_400_000 ? 0 : 1;
-      const recentB = Date.now() - b.lastMs < 7 * 86_400_000 ? 0 : 1;
-      return recentA - recentB || a.distanceKm - b.distanceKm;
-    })
-    .slice(0, MAX_STATIONS);
+  const found = await findStations(loc, radiusMeters, deps, headers);
+  const ranked = found.ranked.slice(0, MAX_STATIONS);
 
   if (ranked.length === 0) return null;
 
@@ -167,6 +219,9 @@ async function fromOpenAq(
   const readings = [...best.values()];
   const pm25 = readings.find((r) => r.parameter === "pm25" && !r.stale);
   const first = ranked[0]!;
+  const used = readings.map((r) => r.distanceKm).filter((d): d is number => typeof d === "number");
+  const nearestStationKm = used.length ? Math.min(...used) : undefined;
+  const widened = found.searchRadiusKm > radiusMeters / 1000;
   return {
     location: {
       ...loc,
@@ -175,11 +230,16 @@ async function fromOpenAq(
     },
     source: "openaq",
     sourceNote:
-      "Measured values from the nearest OpenAQ reference/low-cost stations. PM2.5 category uses US EPA (2024) breakpoints applied to the latest reading (indicative; official AQI uses 24-h averages).",
+      "Measured values from the nearest OpenAQ reference/low-cost stations" +
+      (nearestStationKm !== undefined ? ` (nearest used: ${nearestStationKm} km away` + (widened ? `; search widened to ${found.searchRadiusKm} km because nothing closer reported` : "") + ")" : "") +
+      ". PM2.5 category uses US EPA (2024) breakpoints applied to the latest reading (indicative; official AQI uses 24-h averages)." +
+      (nearestStationKm !== undefined && nearestStationKm > 25 ? " The station is far away, so local conditions may differ." : ""),
     fetchedAt: nowIso(),
     readings,
     pm25Category: pm25 ? pm25Category(pm25.value) : undefined,
     stationsConsidered: ranked.length,
+    nearestStationKm,
+    searchRadiusKm: found.searchRadiusKm,
   };
 }
 
@@ -247,6 +307,6 @@ export async function fetchAirQuality(
   if (openAqError) throw openAqError;
   throw new AppError(
     "not_found",
-    `No air-quality stations reported data within ${Math.round(radiusMeters / 1000)} km of ${loc.latitude},${loc.longitude}.`,
+    `No air-quality stations reported data within ${WIDEST_SEARCH_KM} km of ${loc.name ?? `${loc.latitude},${loc.longitude}`}.`,
   );
 }

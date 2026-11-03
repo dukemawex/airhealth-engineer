@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { LocationQuerySchema } from "../../domain";
 import { fetchAirQuality } from "../../services/airQuality";
-import { resolveLocation } from "../../services/geocode";
+import { geocodeDepsFromConfig, resolveLocation } from "../../services/geocode";
 import { recordAirQuality } from "../sessionState";
 import { defineTool } from "./types";
 
@@ -11,9 +11,20 @@ export const getAirQualitySchema = z
     longitude: z.number().min(-180).max(180).optional().describe("WGS84 longitude"),
     city: z.string().trim().min(1).max(120).optional().describe("City or place name anywhere in the world"),
     countryCode: z.string().trim().length(2).optional().describe("Optional ISO 3166-1 alpha-2 code to disambiguate city"),
-    radiusMeters: z.number().int().min(1000).max(25000).default(15000).describe("Station search radius (max 25 km)"),
+    radiusMeters: z.number().int().min(1000).max(25000).default(15000).describe("Initial station search radius (max 25 km). The search widens automatically (up to 100 km) when nothing nearby reports."),
   })
   .describe("Provide latitude+longitude, or a city (optionally with countryCode). Omit all to reuse the session location.");
+
+const simplify = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .split(",")[0]!
+    .trim();
+function samePlace(a: string, b: string) {
+  return simplify(a) === simplify(b);
+}
 
 export const getAirQualityTool = defineTool({
   name: "getAirQuality",
@@ -25,14 +36,19 @@ export const getAirQualityTool = defineTool({
     const { radiusMeters, ...rest } = args;
     const hasQuery = rest.city !== undefined || (rest.latitude !== undefined && rest.longitude !== undefined);
     let location = ctx.session.location;
-    if (hasQuery) {
+    // The model often re-sends the session's own place name ("Ikeja") after the user shared precise
+    // coordinates. Re-geocoding that name would swap the GPS fix for a town centroid, so keep the fix.
+    const sameAsSession =
+      location?.source === "user_coordinates" &&
+      rest.latitude === undefined &&
+      rest.city !== undefined &&
+      [location.area, location.name, location.admin1].some((n) => n && samePlace(n, rest.city!));
+    if (hasQuery && !sameAsSession) {
       const query = LocationQuerySchema.parse(rest);
-      location = await resolveLocation(query, {
-        baseUrl: ctx.config.airQuality.geocodingBaseUrl,
-        fetchImpl: ctx.fetchImpl,
-        logger: ctx.logger,
-        timeoutMs: ctx.httpTimeoutMs,
-      });
+      location = await resolveLocation(
+        query,
+        geocodeDepsFromConfig(ctx.config.airQuality, { fetchImpl: ctx.fetchImpl, logger: ctx.logger, timeoutMs: ctx.httpTimeoutMs }),
+      );
     }
     if (!location) {
       return { error: "No location known for this session. Ask the user for a city or coordinates." };

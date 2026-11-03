@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { bluetoothStore } from "@/lib/client/bluetooth";
 import type { ApprovalView } from "@/lib/ui-types";
 import { fmtTime, humanize } from "../format";
 import { ShieldIcon } from "./ApprovalRequestCard";
@@ -21,6 +22,7 @@ export function ApprovalModal({
   onClose: () => void;
   onDecide: (a: ApprovalView, decision: "approve" | "reject", note?: string) => void;
 }) {
+  const bt = useSyncExternalStore(bluetoothStore.subscribe, bluetoothStore.get, bluetoothStore.serverSnapshot);
   const ref = useRef<HTMLDialogElement>(null);
   const [note, setNote] = useState("");
 
@@ -47,6 +49,7 @@ export function ApprovalModal({
               <p id="approval-desc" className="card-sub">
                 Muse Spark proposed this action. It will only run if you approve it.
                 {adapter === "sandbox" ? " Sandbox mode: the action is simulated and no physical device changes." : ""}
+                {bt.phase === "connected" && bt.target ? ` If approved, it's also sent to your Bluetooth device “${bt.deviceName}”.` : ""}
               </p>
             </div>
             <button type="button" className="btn btn-ghost icon-btn" onClick={onClose} aria-label="Close without deciding">

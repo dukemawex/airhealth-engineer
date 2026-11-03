@@ -55,6 +55,10 @@ const EnvSchema = z.object({
     emptyToUndefined,
     z.url().default("https://air-quality-api.open-meteo.com/v1"),
   ),
+  // OpenStreetMap Nominatim: reverse geocoding (shared coordinates -> place name) and postcode search.
+  NOMINATIM_BASE_URL: z.preprocess(emptyToUndefined, z.url().default("https://nominatim.openstreetmap.org")),
+  // Open-Meteo forecast API, used only to look up the IANA time zone for shared coordinates.
+  TIMEZONE_BASE_URL: z.preprocess(emptyToUndefined, z.url().default("https://api.open-meteo.com/v1")),
 
   // Devices
   DEVICE_ADAPTER: z.preprocess(
@@ -105,6 +109,8 @@ export interface AppConfig {
     openaqBaseUrl: string;
     modelFallback: boolean;
     geocodingBaseUrl: string;
+    nominatimBaseUrl: string;
+    timezoneBaseUrl: string;
     modelBaseUrl: string;
   };
   devices: {
@@ -166,6 +172,8 @@ export function parseConfig(env: Record<string, string | undefined> = process.en
       openaqBaseUrl: e.OPENAQ_BASE_URL.replace(/\/+$/, ""),
       modelFallback: e.AIR_QUALITY_MODEL_FALLBACK ?? true,
       geocodingBaseUrl: e.GEOCODING_BASE_URL.replace(/\/+$/, ""),
+      nominatimBaseUrl: e.NOMINATIM_BASE_URL.replace(/\/+$/, ""),
+      timezoneBaseUrl: e.TIMEZONE_BASE_URL.replace(/\/+$/, ""),
       modelBaseUrl: e.AIR_QUALITY_MODEL_BASE_URL.replace(/\/+$/, ""),
     },
     devices: {

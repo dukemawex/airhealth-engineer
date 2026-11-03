@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 
-export type RailSection = "chat" | "status" | "interventions" | "how";
+export type RailSection = "chat" | "status" | "interventions" | "news" | "devices" | "how";
 
 const ICONS: Record<RailSection, ReactNode> = {
   chat: <path d="M5 5h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-8l-4 3v-3H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z" />,
@@ -17,6 +17,17 @@ const ICONS: Record<RailSection, ReactNode> = {
       <path d="m9 12 2 2 4-4" />
     </>
   ),
+  news: (
+    <>
+      <path d="M5 4h11a1 1 0 0 1 1 1v14a1 1 0 0 0 2 0V8h1v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a1 1 0 0 1 1-1Z" />
+      <path d="M8 8h6M8 12h6M8 16h4" />
+    </>
+  ),
+  devices: (
+    <>
+      <path d="m7 7 10 10-5 4V3l5 4L7 17" />
+    </>
+  ),
   how: (
     <>
       <circle cx="12" cy="12" r="9" />
@@ -29,6 +40,8 @@ const ITEMS: Array<{ id: RailSection; label: string; controls?: string }> = [
   { id: "chat", label: "Briefing" },
   { id: "status", label: "Status", controls: "status-panel" },
   { id: "interventions", label: "Plans", controls: "status-panel" },
+  { id: "news", label: "News", controls: "status-panel" },
+  { id: "devices", label: "Devices", controls: "status-panel" },
   { id: "how", label: "Guide" },
 ];
 

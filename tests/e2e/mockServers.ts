@@ -117,12 +117,38 @@ export async function startMockAirData(state: { pm25: number; geocodeFails?: boo
         ],
       });
     }
+    if (url.pathname === "/nominatim/reverse") {
+      if (state.geocodeFails) return json(503, { error: "unavailable" });
+      return json(200, {
+        display_name: "Mock Ward, Testville, Test State, Testland",
+        address: { suburb: "Mock Ward", city: "Testville", state: "Test State", country: "Testland", country_code: "tl" },
+      });
+    }
+    if (url.pathname === "/nominatim/search") {
+      if (state.geocodeFails) return json(503, { error: "unavailable" });
+      return json(200, [
+        {
+          lat: "6.455",
+          lon: "3.394",
+          name: url.searchParams.get("q"),
+          display_name: `${url.searchParams.get("q")}, Testland`,
+          addresstype: "postcode",
+          address: { postcode: url.searchParams.get("q"), city: "Testville", country: "Testland", country_code: "tl" },
+        },
+      ]);
+    }
+    if (url.pathname === "/tz/forecast") {
+      return json(200, { timezone: "Africa/Lagos", latitude: Number(url.searchParams.get("latitude")), longitude: Number(url.searchParams.get("longitude")) });
+    }
     if (url.pathname.startsWith("/openaq/")) {
       if (req.headers["x-api-key"] !== "openaq-test-key") return json(401, { detail: "bad key" });
       if (state.openaqDown) return json(503, { detail: "down" });
       if (url.pathname === "/openaq/locations") {
         if (state.noStations) return json(200, { results: [] });
-        const [lat, lon] = (url.searchParams.get("coordinates") ?? "0,0").split(",").map(Number);
+        const bbox = url.searchParams.get("bbox")?.split(",").map(Number);
+        const [lat, lon] = bbox
+          ? [(bbox[1]! + bbox[3]!) / 2, (bbox[0]! + bbox[2]!) / 2]
+          : (url.searchParams.get("coordinates") ?? "0,0").split(",").map(Number);
         return json(200, {
           results: [
             {

@@ -27,6 +27,7 @@ An autonomous agent that works where **engineering meets health**. You say where
 ## Contents
 
 - [How it works](#how-it-works)
+- [Location, voice, news and Bluetooth](#location-voice-news-and-bluetooth)
 - [Quick start (local)](#quick-start-local)
 - [Keys and configuration](#keys-and-configuration)
 - [Deploy to Vercel](#deploy-to-vercel)
@@ -49,7 +50,7 @@ The UI explains this too (header → **How it works**).
 | --- | --- | --- |
 | 1. You describe | A location (any city, area, postcode, or browser geolocation) plus any health context: conditions, symptoms, age group, plans. | `POST /api/agent` |
 | 2. Muse Spark plans | The model reads the conversation and decides which tools to call. It asks only for the minimum it still needs. | Meta Model API `/chat/completions` (streamed) |
-| 3. Real data | Places are geocoded worldwide (Open-Meteo, no key needed). The nearest **OpenAQ v3** station readings are fetched. If no station is within 25 km, CAMS modelled data is used and labelled **Modelled**. | `getAirQuality`, `getHealthContext` |
+| 3. Real data | Places are geocoded worldwide (Open-Meteo, with OpenStreetMap Nominatim for postcodes and addresses; no keys needed). Shared coordinates are reverse-geocoded to a readable place. The nearest **OpenAQ v3** stations are ranked by distance, widening from 25 km up to 100 km when nothing closer reports. If no station reports, CAMS modelled data is used and labelled **Modelled**. | `getAirQuality`, `getHealthContext` |
 | 4. Engineered plan | Room volume → required clean-air delivery rate (CADR, m³/h and CFM) for the target air changes per hour, filter class, ventilation schedule, exposure guidance, and the device commands that would carry it out. | `designIntervention` |
 | 5. Approval gate | Every device command pauses the run. The pending action is persisted, and nothing runs until you **Approve** or **Reject**. Approvals expire (`APPROVAL_TTL_MINUTES`). | `executeDeviceAction`, `/api/approvals/:id/*` |
 | 6. Execute or simulate | Approved commands run through the configured adapter. **Sandbox** (the default) simulates and records state. Home Assistant and a signed webhook are the real adapters. | device adapters |
@@ -65,6 +66,31 @@ Each conversation has its own memory, stored server-side: messages, location, he
 - No data at all: an honest "no data" error. Nothing is fabricated.
 - Meta 429/5xx: retries with backoff that honours `Retry-After`, then a retryable notice with a **Retry** button.
 - KV not configured: in-memory store (fine locally; not durable on serverless).
+
+---
+
+## Location, voice, news and Bluetooth
+
+**Location**
+- **Use my location** checks for https and a denied permission first, then asks for a high-accuracy fix. If that times out it falls back to a coarse fix. Every failure has a plain message: denied, timeout, unavailable, insecure page or unsupported browser.
+- Coordinates are reverse-geocoded (Nominatim, suburb level) and a timezone is looked up (Open-Meteo), so you see "Ikeja, Lagos, Nigeria ±30 m" rather than raw numbers.
+- Typed places are previewed as you type (`GET /api/geocode`) and Start stays disabled until the place resolves. Names go to Open-Meteo first and postcodes or addresses (anything with a digit) go to Nominatim first, each falling back to the other. Ambiguous names prefer the country you typed, then the larger place.
+- Stations are ranked by our own haversine distance, with recent reporters first. The search widens 15 → 25 → 100 km. The card shows the nearest station and its distance, and the note warns when it is more than 25 km away.
+- The agent prompt carries the resolved place and coordinates. If you shared a precise fix, `getAirQuality` keeps it even when the model passes the town name back.
+
+**Voice** (browser only, nothing is recorded server-side)
+- The mic button uses the Web Speech API (Chrome, Edge, Safari) in your browser language and shows interim words as you speak. It is hidden where unsupported; typing always works.
+- **Read replies aloud** speaks Muse Spark's answers with `speechSynthesis`. It is off by default, stored per device, and stops when you send the next message.
+
+**News & talks** (`GET /api/news?place=`)
+- Four tabs: near you, worldwide, talks (webinars, podcasts, lectures, conferences) and Meta (Meta Newsroom and Engineering feeds plus Google News restricted to Meta's sites, filtered to AI for health, science and environment). Meta AI's blog has no RSS feed.
+- Headlines come from Google News RSS and Meta's own RSS. They are filtered to air-quality topics, cached for 30 minutes, and always link to the original with its source and date. Nothing is generated. An empty or unreachable feed shows an honest note.
+
+**Nearby devices (Web Bluetooth)**
+- Chrome or Edge on desktop or Android, over https. Elsewhere the panel explains why it isn't available.
+- **Connect device** opens the browser's own device chooser. The app discovers the GATT services and reads standard Environmental Sensing values (temperature, humidity, pressure, CO₂, PM1/PM2.5/PM10) plus battery. **Share with Muse Spark** sends the readings into the chat.
+- If the device has a writable characteristic (for example a Nordic UART bridge), you can pick it as a target. After you **approve** a device action, and only then, the browser writes `{"type":"airhealth.command","approvalId":…,"command":…}` plus a newline in 20-byte packets. The approval dialog tells you when this will happen.
+- Most air conditioners, purifiers and fans use infrared remotes or vendor Wi-Fi clouds, which a web page can't reach. Use a BLE bridge (for example an ESP32 with an IR blaster) or the Home Assistant adapter. The server-side sandbox, Home Assistant and webhook adapters are unchanged.
 
 ---
 
@@ -108,7 +134,7 @@ Everything is in [`.env.example`](.env.example). The important keys:
 | `AGENT_MAX_ITERATIONS`, `AGENT_RUN_BUDGET_MS`, `TOOL_TIMEOUT_MS`, `APPROVAL_TTL_MINUTES` | no | Limits for the agent loop |
 | `OPENAQ_API_KEY` | recommended | Free key: https://explore.openaq.org/register (sent as `X-API-Key`). Without it, only modelled data is available. |
 | `AIR_QUALITY_MODEL_FALLBACK` | no | `true` by default. Uses Open-Meteo/CAMS modelled data when no station is in range. |
-| `GEOCODING_BASE_URL`, `AIR_QUALITY_MODEL_BASE_URL`, `OPENAQ_BASE_URL` | no | Upstream base URLs. Override only for proxies. |
+| `GEOCODING_BASE_URL`, `NOMINATIM_BASE_URL`, `TIMEZONE_BASE_URL`, `AIR_QUALITY_MODEL_BASE_URL`, `OPENAQ_BASE_URL` | no | Upstream base URLs (Open-Meteo geocoding, OpenStreetMap Nominatim, Open-Meteo forecast for timezones, CAMS, OpenAQ). Override only for proxies. |
 | `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (or `KV_REST_API_URL` + `KV_REST_API_TOKEN`) | **yes on Vercel** | Durable state. Without these, an in-memory store is used. |
 | `API_AUTH_TOKEN` | recommended in prod | When set, every route except `/api/health` requires `Authorization: Bearer <token>`. The UI asks for it once and keeps it in `localStorage`. |
 | `CRON_SECRET` | for background monitoring | Vercel sends it as `Authorization: Bearer …`. The cron route refuses to run without it. `openssl rand -hex 32` |
@@ -199,6 +225,8 @@ Every response has an `x-request-id` header. If `API_AUTH_TOKEN` is set, send `A
 | GET | `/api/approvals/:id` | none | One approval |
 | POST | `/api/approvals/:id/approve` | `{ decidedBy?, note? }`, `?stream=ui` optional | `{ approval, run }` (410 if expired, 409 if already decided), or a stream |
 | POST | `/api/approvals/:id/reject` | `{ reason?, decidedBy? }`, `?stream=ui` optional | Same as approve |
+| GET | `/api/geocode` | `?q=…&countryCode=…` or `?lat=…&lon=…&accuracy=…` | `{ location, label }`: the resolved place, used for the live preview. 404 `not_found` with a hint if nothing matches. |
+| GET | `/api/news` | `?place=…` (optional) | `{ place, fetchedAt, sections: [{ id, title, items: [{ title, url, source, publishedAt }], note? }] }` |
 | GET | `/api/interventions/:id` | none | One intervention plan |
 | PATCH | `/api/interventions/:id` | `{ status: "completed" \| "cancelled" }` | Updated intervention |
 | GET | `/api/cron/monitor` | header `Authorization: Bearer $CRON_SECRET` | `{ checked, notified, results }`. 401 with a wrong secret; `config_missing` if no secret is set. |
@@ -224,6 +252,8 @@ src/
   components/
     AgentApp.tsx                    useChat + custom transport (message / resume / approval), polling, restore
     layout/  Masthead, LeftRail, StatusSidebar (news-style status desk), HowItWorksDialog, AccessDialog
+    news/    NewsPanel (tabs: near you, world, talks, Meta)
+    devices/ BluetoothPanel (Web Bluetooth connect, readings, approved-command target)
     cards/   ToolResultCard, AirQualityCard (+ Sparkline), InterventionPlanCard, HealthContextSummary,
              ApprovalRequestCard, ApprovalModal
     chat/    MessageBubble, Composer
@@ -232,7 +262,10 @@ src/
   lib/
     meta/        Meta Model API client: chat completions, SSE parser, tool-call delta accumulator, retries
     agent/       loop (iterations, budget, tool timeouts, approval pause/resume), tools/*, prompt, monitor, status, uiStream
-    services/    geocode (Open-Meteo), airQuality (OpenAQ v3 + CAMS fallback), aqi (US EPA breakpoints)
+    services/    geocode (Open-Meteo + Nominatim, reverse, timezone), airQuality (OpenAQ v3 rings + CAMS fallback),
+                 aqi (US EPA breakpoints), news (Google News + Meta RSS)
+    client/      geolocation, resolvePlace, speech (dictation + read aloud), bluetooth (GATT bridge)
+    place.ts     formatPlace / shortPlace (shared by server and client)
     devices/     sandbox | homeassistant | webhook adapters
     storage/     Upstash/Vercel KV store + in-memory fallback
     config.ts    zod-validated env;  logger.ts structured JSON logs;  api.ts route wrapper (auth, errors, request ids)
@@ -355,6 +388,9 @@ npm run lint
   - combined status
   - monitor decision parsing
   - approval gating (pause → approve/reject/expire → resume, double-decision 409)
+  - location: reverse naming, postcode → Nominatim, fallbacks, ranking, 15/25/100 km widening
+  - news RSS parsing, entity decoding, topic filters and honest empty sections
+  - voice text clean-up and chunking; Bluetooth SFLOAT decoding and command packets
   - logo sync
 - **End-to-end** (`tests/e2e/`):
   - Real route handlers talk over real HTTP to a **scripted mock Muse Spark server** that speaks the Chat Completions SSE format, and to mock geocoding, OpenAQ and model air-quality servers.
@@ -392,7 +428,8 @@ npm run lint
 **Unconfirmed or configurable:**
 - **Meta Model API dashboard URL.** Key creation is described in the docs ("Model API dashboard → API keys"). Its exact URL isn't linked here.
 - **Chat Completions vs the Responses API.** Chat Completions doesn't carry the model's reasoning across turns, and Meta recommends the Responses API for multi-turn reasoning. This app uses Chat Completions (stable, documented tool calling) and keeps conversation memory server-side. Moving to Responses is a contained change in `src/lib/meta/`.
-- **OpenAQ distance.** Station selection uses `/v3/locations?coordinates=…&radius≤25000`. Distance is computed locally rather than relying on a response field.
+- **OpenAQ distance.** Station selection uses `/v3/locations?coordinates=…&radius≤25000&limit=1000`, then a `bbox` of about ±100 km. Distance is computed locally rather than relying on a response field.
+- **Nominatim usage policy.** At most about 1 request/s, with an identifying User-Agent. Results are cached for 24 h per ~110 m cell and typed previews are debounced. Point `NOMINATIM_BASE_URL` at your own instance for heavy use.
 - **Home Assistant fresh-air dampers** have no standard climate service. They are mapped to a `number.set_value` entity.
 - **AI SDK v7.** UI-stream part names were checked against the installed `ai@7` / `@ai-sdk/react@4` types. Future majors may rename them.
 - **Vercel Hobby cron** runs at most once a day, which is why the client also polls.

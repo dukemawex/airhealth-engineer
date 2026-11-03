@@ -1,3 +1,4 @@
+import { shortPlace } from "../place";
 import type { AirQualitySnapshot, Session } from "../domain";
 import { CATEGORY_RANK, pm25Category, pm25ToUsAqi } from "../services/aqi";
 import { snapshotPm25 } from "./sessionState";
@@ -63,7 +64,7 @@ export function combineStatus(input: {
     headline,
     reasons,
     steps: [
-      { key: "location", done: Boolean(session.location), label: "Location", detail: session.location ? [session.location.name, session.location.country].filter(Boolean).join(", ") || `${session.location.latitude.toFixed(2)}, ${session.location.longitude.toFixed(2)}` : undefined },
+      { key: "location", done: Boolean(session.location), label: "Location", detail: session.location ? shortPlace(session.location) : undefined },
       { key: "air", done: Boolean(aq), label: "Air quality", detail: aq ? (aq.source === "openaq" ? "Measured (OpenAQ)" : "Modelled (CAMS)") : undefined },
       { key: "health", done: Boolean(session.profile), label: "Health context", detail: session.profile ? (assessment?.sensitiveGroup ? "Sensitive group" : "Recorded") : undefined },
       { key: "plan", done: input.activeInterventions + input.proposedInterventions > 0, label: "Intervention plan", detail: input.activeInterventions > 0 ? "Active" : input.proposedInterventions > 0 ? "Proposed" : undefined },

@@ -11,7 +11,7 @@ import { fmtTime, humanize } from "../format";
 const LEVEL_TONE: Record<string, string | undefined> = { ok: "ok", watch: "watch", act: "act", urgent: "urgent" };
 
 /** One news-sidebar section: heavy top rule + serif heading (focusable target for the rail). */
-function NewsSection({ id, title, aside, children }: { id: string; title: string; aside?: ReactNode; children: ReactNode }) {
+export function NewsSection({ id, title, aside, children }: { id: string; title: string; aside?: ReactNode; children: ReactNode }) {
   return (
     <section className="news-section" aria-labelledby={id}>
       <h2 className="section-head" id={id} tabIndex={-1}>
@@ -41,6 +41,7 @@ export function StatusSidebar({
   onClose,
   onRecheck,
   rechecking,
+  children,
 }: {
   status: StatusReport | null;
   loading: boolean;
@@ -50,6 +51,7 @@ export function StatusSidebar({
   onClose: () => void;
   onRecheck: () => void;
   rechecking: boolean;
+  children?: ReactNode;
 }) {
   const c = status?.combined;
   const skeleton = !status && loading;
@@ -221,6 +223,7 @@ export function StatusSidebar({
           </p>
         )}
       </NewsSection>
+      {children}
     </aside>
   );
 }

@@ -9,7 +9,7 @@ import type { Logger } from "../logger";
 import { hashSafetyIdentifier } from "../meta/client";
 import type { ChatMessage, ModelClient, ToolCall } from "../meta/types";
 import { fetchAirQuality } from "../services/airQuality";
-import { resolveLocation } from "../services/geocode";
+import { geocodeDepsFromConfig, resolveLocation } from "../services/geocode";
 import { decideNotification } from "./monitor";
 import { recordAirQuality } from "./sessionState";
 import { mergeProfile } from "./tools/getHealthContext";
@@ -170,12 +170,10 @@ export class AgentRunner {
       userRef: input.userRef,
     };
     if (input.location) {
-      session.location = await resolveLocation(input.location, {
-        baseUrl: this.cfg.airQuality.geocodingBaseUrl,
-        fetchImpl: this.fetchImpl,
-        logger: this.deps.logger,
-        timeoutMs: this.cfg.agent.toolTimeoutMs,
-      });
+      session.location = await resolveLocation(
+        input.location,
+        geocodeDepsFromConfig(this.cfg.airQuality, { fetchImpl: this.fetchImpl, logger: this.deps.logger, timeoutMs: this.cfg.agent.toolTimeoutMs }),
+      );
     }
     await this.deps.store.putSession(session);
     if (session.location) await this.deps.store.addMonitoredSession(session.id).catch(() => undefined);
@@ -214,12 +212,10 @@ export class AgentRunner {
     return withLock(this.deps.store, this.lockKey(sessionId), 30_000, async () => {
       const session = await this.getSession(sessionId);
       if (input.location) {
-        session.location = await resolveLocation(input.location, {
-          baseUrl: this.cfg.airQuality.geocodingBaseUrl,
-          fetchImpl: this.fetchImpl,
-          logger: this.deps.logger,
-          timeoutMs: this.cfg.agent.toolTimeoutMs,
-        });
+        session.location = await resolveLocation(
+        input.location,
+        geocodeDepsFromConfig(this.cfg.airQuality, { fetchImpl: this.fetchImpl, logger: this.deps.logger, timeoutMs: this.cfg.agent.toolTimeoutMs }),
+      );
         await this.deps.store.addMonitoredSession(session.id).catch(() => undefined);
       }
       if (input.profile) session.profile = mergeProfile(session.profile, input.profile, input.replaceProfile ?? false);

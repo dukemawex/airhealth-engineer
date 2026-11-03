@@ -1,6 +1,7 @@
 import type { AirQualitySnapshot } from "@/lib/domain";
 import { pm25Category, pm25ToUsAqi } from "@/lib/services/aqi";
 import { snapshotPm25 } from "@/lib/agent/sessionState";
+import { formatPlace } from "@/lib/place";
 import { POLLUTANT_LABEL, categoryTone, fmtNum, fmtTime, humanize } from "../format";
 import { Sparkline } from "./Sparkline";
 
@@ -16,9 +17,12 @@ export function AirQualityCard({
   const pm25 = snapshotPm25(snapshot);
   const cat = pm25 !== undefined ? pm25Category(pm25) : undefined;
   const aqi = pm25 !== undefined ? pm25ToUsAqi(pm25) : undefined;
-  const place = [snapshot.location.name, snapshot.location.admin1, snapshot.location.country].filter(Boolean).join(", ");
+  const place = formatPlace(snapshot.location);
   const measured = snapshot.source === "openaq";
-  const station = snapshot.readings.find((r) => r.stationName)?.stationName;
+  const nearest = snapshot.readings
+    .filter((r) => r.stationName)
+    .sort((a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity))[0];
+  const gps = snapshot.location.source === "user_coordinates";
   return (
     <section className="card" aria-label={`Air quality${place ? ` for ${place}` : ""}`}>
       <div className="card-header">
@@ -27,7 +31,15 @@ export function AirQualityCard({
             Air now<span className="sep" aria-hidden="true" />
             {measured ? "Measured · OpenAQ" : "Modelled · CAMS"}
           </span>
-          <h3 className="card-title">{place || `${snapshot.location.latitude.toFixed(3)}, ${snapshot.location.longitude.toFixed(3)}`}</h3>
+          <h3 className="card-title">{place}</h3>
+          <p className="place-meta">
+            <span>{gps ? "Your shared location" : snapshot.location.query ? `From “${snapshot.location.query}”` : "Searched place"}</span>
+            <span aria-hidden="true">·</span>
+            <span>
+              {snapshot.location.latitude.toFixed(3)}, {snapshot.location.longitude.toFixed(3)}
+            </span>
+            {gps && snapshot.location.accuracyMeters !== undefined && <span>±{Math.round(snapshot.location.accuracyMeters)} m</span>}
+          </p>
         </div>
         {cat ? (
           <span className="badge" data-tone={categoryTone(cat)}>
@@ -64,7 +76,12 @@ export function AirQualityCard({
         </ul>
       )}
       <p className="card-sub">
-        {station ? `Nearest station: ${station}. ` : ""}
+        {nearest ? (
+          <>
+            Nearest station: <strong>{nearest.stationName}</strong>
+            {nearest.distanceKm !== undefined ? ` · ${fmtNum(nearest.distanceKm)} km away` : ""}.{" "}
+          </>
+        ) : null}
         Updated {fmtTime(snapshot.fetchedAt, true)}. {snapshot.sourceNote}
       </p>
     </section>

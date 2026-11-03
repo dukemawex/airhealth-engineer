@@ -1,6 +1,25 @@
 "use client";
 
 import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useDictation, useSpeakPreference } from "@/lib/client/speech";
+
+function MicIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+    </svg>
+  );
+}
+
+function SpeakerIcon({ on }: { on: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 9v6h4l5 4V5L8 9H4Z" />
+      {on ? <path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" /> : <path d="m17 9 5 6M22 9l-5 6" />}
+    </svg>
+  );
+}
 
 export function Composer({
   disabled,
@@ -17,10 +36,18 @@ export function Composer({
 }) {
   const [text, setText] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
+  const dictation = useDictation((heard) => {
+    if (!heard) return;
+    setText((t) => (t.trim() ? `${t.trimEnd()} ${heard}` : heard));
+    ref.current?.focus();
+  });
+  const speakPref = useSpeakPreference();
+
   const submit = (e?: FormEvent) => {
     e?.preventDefault();
     const t = text.trim();
     if (!t || disabled) return;
+    if (dictation.listening) dictation.stop();
     onSend(t);
     setText("");
     ref.current?.focus();
@@ -31,24 +58,46 @@ export function Composer({
       submit();
     }
   };
+  const hint =
+    dictation.error ??
+    disabledReason ??
+    "Enter to send · Shift+Enter for a new line · Device actions always ask for your approval first.";
   return (
-    <div className="composer">
+    <div className="composer" data-listening={dictation.listening}>
       <form onSubmit={submit} aria-label="Send a message">
         <label htmlFor="composer-input" className="sr-only">
           Message AirHealth Engineer
         </label>
-        <textarea
-          id="composer-input"
-          ref={ref}
-          className="textarea"
-          rows={1}
-          value={text}
-          maxLength={8000}
-          placeholder="Describe where you are, how you feel, or ask about your plan…"
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={onKey}
-          aria-describedby="composer-hint"
-        />
+        <div className="composer-field">
+          <textarea
+            id="composer-input"
+            ref={ref}
+            className="textarea"
+            rows={1}
+            value={text}
+            maxLength={8000}
+            placeholder={dictation.listening ? "Listening… speak now" : "Describe where you are, how you feel, or ask about your plan…"}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={onKey}
+            aria-describedby="composer-hint composer-interim"
+          />
+          <p id="composer-interim" className="composer-interim" aria-live="polite">
+            {dictation.listening ? dictation.interim || "Listening…" : ""}
+          </p>
+        </div>
+        {dictation.supported && (
+          <button
+            type="button"
+            className="btn btn-secondary icon-btn mic-btn"
+            onClick={dictation.listening ? dictation.stop : dictation.start}
+            aria-pressed={dictation.listening}
+            aria-label={dictation.listening ? "Stop voice input" : "Speak your message"}
+            title={dictation.listening ? "Stop voice input" : "Speak your message"}
+            disabled={disabled && !dictation.listening}
+          >
+            <MicIcon />
+          </button>
+        )}
         {busy ? (
           <button type="button" className="btn btn-secondary" onClick={onStop}>
             Stop
@@ -59,9 +108,23 @@ export function Composer({
           </button>
         )}
       </form>
-      <p id="composer-hint" className="composer-hint">
-        {disabledReason ?? "Enter to send · Shift+Enter for a new line · Device actions always ask for your approval first."}
-      </p>
+      <div className="composer-meta">
+        <p id="composer-hint" className="composer-hint" data-tone={dictation.error ? "error" : undefined}>
+          {hint}
+        </p>
+        {speakPref.supported && (
+          <button
+            type="button"
+            className="speak-toggle"
+            aria-pressed={speakPref.on}
+            onClick={() => speakPref.set(!speakPref.on)}
+            title="Read Muse Spark's replies aloud on this device"
+          >
+            <SpeakerIcon on={speakPref.on} />
+            <span>Read replies aloud</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 }

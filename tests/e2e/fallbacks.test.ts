@@ -22,6 +22,8 @@ beforeAll(async () => {
     OPENAQ_API_KEY: "openaq-test-key",
     OPENAQ_BASE_URL: `${data.url}/openaq`,
     GEOCODING_BASE_URL: `${data.url}/geo`,
+    NOMINATIM_BASE_URL: `${data.url}/nominatim`,
+    TIMEZONE_BASE_URL: `${data.url}/tz`,
     AIR_QUALITY_MODEL_BASE_URL: `${data.url}/model`,
     UPSTASH_REDIS_REST_URL: "",
     KV_REST_API_URL: "",

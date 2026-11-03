@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StatusReport } from "@/lib/agent/status";
 import type { LocationQuery } from "@/lib/domain";
 import { ApiError, apiFetch, authHeaders, conversationStore, fetchJsonLoose, tokenStore } from "@/lib/client/api";
+import { getSpeakPreference, speak, stopSpeaking } from "@/lib/client/speech";
 import type { AgentUIMessage, ApprovalView } from "@/lib/ui-types";
 import { ApprovalModal } from "./cards/ApprovalModal";
 import { Composer } from "./chat/Composer";
@@ -14,7 +15,11 @@ import { AccessDialog } from "./layout/AccessDialog";
 import { LeftRail, type RailSection } from "./layout/LeftRail";
 import { Masthead } from "./layout/Masthead";
 import { HowItWorksDialog } from "./layout/HowItWorksDialog";
-import { StatusSidebar } from "./layout/StatusSidebar";
+import { NewsSection, StatusSidebar } from "./layout/StatusSidebar";
+import { BluetoothPanel } from "./devices/BluetoothPanel";
+import { NewsPanel } from "./news/NewsPanel";
+import { describeCommand } from "./cards/InterventionPlanCard";
+import { bridgeReady, sendApprovedCommand } from "@/lib/client/bluetooth";
 import { EmptyState } from "./states/EmptyState";
 import { LoadingState, SuccessToast } from "./states/States";
 
@@ -124,6 +129,8 @@ export function AgentApp() {
   const [banner, setBanner] = useState<string | null>(null);
   const autoShown = useRef(new Set<string>());
   const lastDecision = useRef<"approve" | "reject" | null>(null);
+  /** Approved command waiting to be forwarded to a connected Bluetooth bridge once the server confirms. */
+  const pendingBle = useRef<ApprovalView | null>(null);
 
 
   const refreshStatus = useCallback(async (id = conn.getId()) => {
@@ -147,11 +154,24 @@ export function AgentApp() {
     onData: (part) => {
       if (part.type === "data-conversation" && part.data.id !== conn.getId()) setConversationId(part.data.id);
     },
-    onFinish: () => {
+    onFinish: ({ message, isAbort, isError }) => {
       void refreshStatus();
+      // Spoken replies: only when the user turned them on, and only the final assistant text.
+      if (!isAbort && !isError && message.role === "assistant" && getSpeakPreference()) {
+        const text = message.parts.map((p) => (p.type === "text" ? p.text : "")).join("\n").trim();
+        if (text) speak(text);
+      }
       if (lastDecision.current) {
         setToast(lastDecision.current === "approve" ? "Approved. Device action processed and status updated." : "Rejected. Nothing was executed.");
         lastDecision.current = null;
+      }
+      // Forward to Bluetooth only after the server accepted the approval (stream finished cleanly).
+      const ble = pendingBle.current;
+      pendingBle.current = null;
+      if (ble && !isAbort && !isError && bridgeReady()) {
+        void sendApprovedCommand(ble.id, ble.command, describeCommand(ble.command)).then((ok) =>
+          setToast(ok ? "Approved command sent to your Bluetooth device." : "Approved, but the Bluetooth device didn't accept the command."),
+        );
       }
     },
     onError: (err) => {
@@ -159,6 +179,7 @@ export function AgentApp() {
       if (unauthorized) setAccessOpen(true);
       setBanner(message);
       lastDecision.current = null;
+      pendingBle.current = null;
       void refreshStatus();
     },
   });
@@ -258,12 +279,14 @@ export function AgentApp() {
 
   const send = (text: string, location?: LocationQuery) => {
     setBanner(null);
+    stopSpeaking();
     void sendMessage({ text }, { body: { location } satisfies SendBody });
   };
   const decide = (a: ApprovalView, decision: "approve" | "reject", note?: string) => {
     setReviewing(null);
     setBanner(null);
     lastDecision.current = decision;
+    pendingBle.current = decision === "approve" ? a : null;
     void sendMessage(undefined, { body: { approval: { id: a.id, decision, note } } satisfies SendBody });
   };
   const retry = () => {
@@ -312,17 +335,25 @@ export function AgentApp() {
       return;
     }
     setSidebarOpen(true);
-    const target = document.getElementById(s === "status" ? "sb-air" : "sb-interventions");
+    const target = document.getElementById(
+      s === "status" ? "sb-air" : s === "news" ? "sb-news" : s === "devices" ? "sb-devices" : "sb-interventions",
+    );
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     // Wait a frame so the drawer is visible before focusing inside it.
     requestAnimationFrame(() => {
-      target?.scrollIntoView({ block: "start", behavior: reduce ? "auto" : "smooth" });
+      // Scroll only the sidebar: scrollIntoView would also scroll overflow-hidden ancestors (the app shell).
+      const panel = document.getElementById("status-panel");
+      if (target && panel) {
+        const top = target.getBoundingClientRect().top - panel.getBoundingClientRect().top + panel.scrollTop - 12;
+        panel.scrollTo({ top: Math.max(0, top), behavior: reduce ? "auto" : "smooth" });
+      }
       target?.focus({ preventScroll: true });
     });
   };
 
   const history = status?.airQualityHistory ?? [];
   const placeLabel = status?.combined?.steps.find((x) => x.key === "location")?.detail;
+  const newsPlace = status?.location?.name ?? status?.location?.area ?? undefined;
   const monitoringOn = Boolean(status?.monitoring?.enabled && status.location);
   const lastIsUser = messages.at(-1)?.role === "user";
 
@@ -420,7 +451,14 @@ export function AgentApp() {
           onClose={closeSidebar}
           onRecheck={recheck}
           rechecking={rechecking}
-        />
+        >
+          <NewsSection id="sb-news" title="News & talks">
+            <NewsPanel place={newsPlace} />
+          </NewsSection>
+          <NewsSection id="sb-devices" title="Nearby devices">
+            <BluetoothPanel onShareReadings={(t) => send(t)} canShare={!busy && pending.length === 0 && !restoring} />
+          </NewsSection>
+        </StatusSidebar>
       </div>
       <ApprovalModal approval={reviewing} adapter={status?.deviceAdapter} onClose={() => setReviewing(null)} onDecide={decide} />
       <HowItWorksDialog open={howOpen} onClose={() => setHowOpen(false)} />

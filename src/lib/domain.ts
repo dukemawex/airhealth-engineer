@@ -9,6 +9,7 @@ export const LocationQuerySchema = z
   .object({
     latitude: z.number().min(-90).max(90).optional(),
     longitude: z.number().min(-180).max(180).optional(),
+    accuracyMeters: z.number().min(0).max(1_000_000).optional(),
     city: z.string().trim().min(1).max(120).optional(),
     countryCode: z
       .string()
@@ -25,12 +26,21 @@ export type LocationQuery = z.infer<typeof LocationQuerySchema>;
 export interface ResolvedLocation {
   latitude: number;
   longitude: number;
+  /** Neighbourhood / suburb, when known (reverse geocoding or a precise search hit). */
+  area?: string;
+  /** City, town or village. */
   name?: string;
   admin1?: string;
   country?: string;
   countryCode?: string;
   timezone?: string;
   source: "user_coordinates" | "geocoded";
+  /** Which service named the place: Open-Meteo search, Nominatim search, or Nominatim reverse. */
+  resolvedBy?: "open-meteo" | "nominatim" | "nominatim-reverse";
+  /** Browser-reported accuracy for shared coordinates, in metres. */
+  accuracyMeters?: number;
+  /** What the user typed, kept so the UI can show "you typed X, we found Y". */
+  query?: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -90,6 +100,10 @@ export interface AirQualitySnapshot {
   readings: PollutantReading[];
   pm25Category?: AqiCategory;
   stationsConsidered?: number;
+  /** Distance to the nearest station that supplied a reading, km. */
+  nearestStationKm?: number;
+  /** Search radius that found the stations, km (widened automatically when nothing is near). */
+  searchRadiusKm?: number;
 }
 
 export type AqiCategory =

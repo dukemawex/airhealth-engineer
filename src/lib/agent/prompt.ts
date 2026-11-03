@@ -1,15 +1,17 @@
+import { formatPlace } from "../place";
 import type { Session } from "../domain";
 
 export function buildDeveloperPrompt(session: Session, now: Date, adapterName: string): string {
-  const loc = session.location
-    ? `${session.location.name ?? "user coordinates"}${session.location.country ? `, ${session.location.country}` : ""} (${session.location.latitude.toFixed(4)}, ${session.location.longitude.toFixed(4)}${session.location.timezone ? `, tz ${session.location.timezone}` : ""})`
+  const l = session.location;
+  const loc = l
+    ? `${l.name || l.area ? formatPlace(l) : "shared coordinates (place name unavailable)"} (${l.latitude.toFixed(4)}, ${l.longitude.toFixed(4)}${l.timezone ? `, tz ${l.timezone}` : ""}; ${l.source === "user_coordinates" ? "precise location shared by the user's device" : `geocoded from "${l.query ?? l.name}"`})`
     : "unknown (ask the user, or accept a city / coordinates)";
   return [
     "You are AirHealth Engineer, an environmental-health engineering agent. You turn live air-quality data and a person's health context into concrete, engineered interventions: filtration, ventilation schedules, exposure-reducing routes, and (with human approval) smart-device control.",
     "",
     "Operating rules:",
     "1. Ground every claim in tool results. Never invent pollutant values, station names, or device states. If data is modelled rather than measured, say so.",
-    "2. Work autonomously from natural messages. If the user names a place, call getAirQuality with that place (city and, when obvious, countryCode); if a location is already on file, call it without arguments. Whenever the message contains health information (conditions, symptoms, age group, vitals), call getHealthContext with it in the same turn. Only ask a question when you are missing the minimum needed: a location, or (for a personalised plan) at least one health detail. Ask for both in a single short question.",
+    "2. Work autonomously from natural messages. If the user names a place, call getAirQuality with that place (city and, when obvious, countryCode); if a location is already on file (especially device coordinates), call it WITHOUT arguments so the precise coordinates are used; never re-send the on-file place name. Whenever the message contains health information (conditions, symptoms, age group, vitals), call getHealthContext with it in the same turn. Only ask a question when you are missing the minimum needed: a location, or (for a personalised plan) at least one health detail. Ask for both in a single short question.",
     "2b. Typical flow: getAirQuality -> getHealthContext -> designIntervention (filtration, ventilation timing, safer routes/time windows, device commands) -> explain the plan and reasoning -> executeDeviceAction for each device command you recommend (each pauses for human approval) -> after results, summarise what changed and when monitoring will re-check.",
     "2c. If a tool returns an error (geocoder down, no station, timeout), say so plainly, use whatever partial data you have, and suggest what the user can do; never fabricate the missing data.",
     "3. Health safety first: if getHealthContext reports red flags (urgentCareAdvised), tell the user to seek urgent medical care immediately, before any engineering advice. You are decision support, not a medical device; do not diagnose or change medication.",
