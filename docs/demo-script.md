@@ -2,78 +2,96 @@
 
 **Every feature shown in this demo was built during the hackathon.** The first commit was on 2026-11-03 at 04:12 (+01:00, Africa/Lagos). The commit for each feature is listed under [Built during the hackathon](../README.md#built-during-the-hackathon) in the README.
 
-**Pitch in one line:** an agent that engineers your indoor air, not medical advice. It senses, plans, asks you, then controls a physical system: purifier, windows and HVAC.
+**Pitch in one line:** an agent that engineers the air in your bedroom, built on Meta's models (Muse Spark 1.3, SAM 3.1, Muse Voice Transcribe, Muse Image). It senses, plans, asks you, then controls the devices. It is not medical advice.
+
+This script matches the recorded demo (about 2:58). On-screen wording uses a **respiratory sensitivity profile**; the demo does not name a condition.
 
 **Setup before recording**
 - Open https://airhealth-engineer.vercel.app in Chrome in the dark theme, signed in with the access token.
 - Click **Judge mode** once to check that the capability badges show live (Muse Spark, SAM 3.1, Muse Voice Transcribe, Muse Image).
-- Have a purifier plugged into a smart plug (Shelly or a Home Assistant switch: **Devices → Smart plug**, then **Check connection**), or connected through Home Assistant, the webhook or a BLE bridge. Otherwise leave it in **Sandbox** (the panel shows *No plug connected*) and say so on camera.
-- Have WhatsApp installed on the phone you'll share from.
-- Keep a phone photo of a hazy window or room ready. Take it live if the air is hazy.
+- Device actions run in **Sandbox** unless a smart plug is connected (**Devices → Smart plug**, then **Check connection**). If it's the sandbox, say so on camera.
+- Keep a hazy window or room in view, or use a prepared photo. If you use a generated test scene or a simulated camera or mic, caption it on screen.
 - Start from an empty briefing (**New briefing**). Nothing is seeded.
+- Time-lapse any wait and label it (*Sped up 8x*). Never cut away from a result to fake speed.
 
 ---
 
-## 0:00–0:20 · The frame
+## 0:00–0:12 · Hook
 
-**Show:** the studio home: the "Engineer your indoor air" hero, the fanned model cards and the prompt bar with its model chips.
+**Show:** title card: AirHealth Engineer, an agent that engineers the air in your bedroom.
 
-**Say:** "This is AirHealth Engineer. It isn't a chatbot about air. It's an agent that closes the loop on a physical system: it senses the air, plans device actions, asks me, then drives my purifier, windows and HVAC. It only uses Meta models, and it works anywhere in the world. Everything you'll see was built during this hackathon."
+**Say:** "In Lagos, smoky nights and generator fumes push fine particles far above healthy levels, and the bedroom is where we spend the most hours. AirHealth Engineer is an agent that engineers the air in that room, built on Meta's models."
 
-## 0:20–0:45 · Voice → Muse Voice Transcribe
+## 0:12–0:31 · Voice → Muse Voice Transcribe
 
-**Do:** tap the **Voice** chip (it shows *Muse*) and say: *"I'm in Ikeja with asthma."*
+**Do:** tap the **Voice** chip (it shows *Muse*) and say: *"I live in Ikeja, in Lagos. I'm sensitive to smoke and dust."* Then type: *"Use a respiratory sensitivity profile. Plan my 12 m² bedroom for tonight."* and send.
 
 **Show:** the words appear in the prompt bar, transcribed by **Muse Voice Transcribe**.
 
-**Say:** "Push-to-talk goes to Muse Voice Transcribe. If it's unavailable, the chip falls back to the browser's speech recognition. Asthma becomes my **sensitivity profile**. It only tightens device thresholds. It's not a diagnosis and not medical advice."
+**Say:** "I just speak. Muse Voice Transcribe turns my words into text. I add the room, and Muse Spark 1.3 takes over."
 
-## 0:45–1:15 · Snap the haze → SAM 3.1 outlines it
+## 0:31–1:05 · Location card, sensitivity profile, 72-hour plan and air twin
 
-**Do:** tap **Camera**. The live sheet opens on the rear camera (switch camera and torch are there if needed). Frame the hazy window, the vent and the purifier, tap the shutter, then **Use photo**. Backup if the camera is blocked or the venue Wi-Fi is slow: tap **Photo · SAM 3.1** and upload the prepared photo.
+**Show:** the agent run (time-lapsed and labelled), then the tabs in turn:
+- **Location card:** the nearest OpenAQ station for Ikeja (labelled *Measured*, or *Modelled* when it falls back to CAMS)
+- **Sensitivity profile:** the respiratory sensitivity profile, which only tightens device targets
+- **72-h plan:** Muse Spark with `json_schema` sets the exposure steps and finds the **best window** (for example *tomorrow 14:00–15:00*)
+- **Air twin:** the red dashed *as-is* line against the plan's curve, labelled *Model, not a measurement*
 
-**Show:** the scene card. **SAM 3.1** masks outline the haze, the open window and the vent. Muse Spark's structured scene shows the haze level, the openings, whether a purifier is visible and the estimated floor area. The photo also lands in the gallery strip.
+**Say:**
+- "Muse Spark pulls the nearest OpenAQ station for Ikeja: moderate right now, with a smoky peak forecast tonight."
+- "It builds a respiratory sensitivity profile, which only tightens device targets. It's not medical advice."
+- "A seventy-two hour forecast plan sets exposure steps, and finds the best window: tomorrow afternoon."
+- "Then the intervention plan sizes a HEPA purifier for my twelve square metre bedroom, and the air twin simulates when the room drops below target."
 
-**Then:** flip the **Live** toggle and open the window (or move the camera). The event log shows *Scene changed → plan updated*. It only calls the model when the frame actually changes, and stops after 10 reads.
+## 1:05–1:20 · Approval gate → sandbox action
 
-**Then (wow beat):** the **Outlines** switch turns on with Live. SAM 3.1 masks for the window, door, purifier, fan, AC, vent and person appear on the moving picture with a HUD (*SAM 3.1 · seg/s · latency · objects*) and chips like *Smoke/haze: none seen*. Light a match or incense near the window (or swing to the hazy view): *Smoke/haze: detected* turns orange and the log shows *SAM 3.1: smoke/haze appeared → updating the plan*. Say: "SAM doesn't take a live stream, so we send a small keyframe about every second and a half and track the masks on the phone in between. Every outline is a real SAM mask. If SAM is down it says so and shows labelled boxes instead."
+**Do:** open the first device step and click **Approve**.
 
-**Say:** "That's a live frame from the room, not a stock image. Muse Spark reads it into a strict JSON scene, and SAM 3.1 outlines what matters. This isn't image analysis for its own sake. The scene feeds the device plan: the open window it found and the room size it estimated go straight into the engineering."
+**Show:** the approval card, then the result. In the sandbox it reads as a sandbox action, and no real device changes.
 
-## 1:15–1:55 · Muse Spark reasons → plan timeline
+**Say:** "Nothing touches a device without my approval. I review the action and approve it. Here it runs in sandbox mode, so no real device changes."
 
-**Show:** the reasoning timeline expanding step by step:
-- resolve Ikeja and fetch live air from OpenAQ (or CAMS, labelled *Modelled*)
-- apply the sensitivity profile
-- design the intervention: CADR from room volume and air changes, plus the filter class
-- run the **72-hour CAMS forecast plan**, Muse Spark with `json_schema`, with an hour-by-hour device timeline for the worst hours
+## 1:20–1:49 · Camera photo → Muse Spark scene + SAM 3.1 outlines, then a rejected step
 
-**Show:** the indoor plan card's **Air twin**: the red dashed *as-is* line against the plan's curve, and the headline *Below 9 µg/m³ by …*. It's labelled *Model, not a measurement*.
+**Do:** tap **Camera**, frame the window, tap the shutter, then **Use photo**. When the plan tightens, open the next device step, click **Reject** and add a reason.
 
-**Say:** "Every tool call is visible. In Judge mode you can see which Meta model handled each step and whether anything fell back. The 72-hour plan says: close the window it saw, run the purifier on high through tonight's peak, then switch to ventilation when the forecast clears."
+**Show:** the scene card: **SAM 3.1** outlines the window with smoke outside, and Muse Spark's structured scene shows the haze level. Then the reject dialog with the note.
 
-## 1:55–2:25 · Approve → purifier on
+**Say:** "Now I snap the room. Muse Spark reads the scene, and SAM 3.1 outlines the window with smoke outside. The plan tightens, and I can still reject a step, with a reason the agent respects."
 
-**Do:** click **Approve** on the first step, *purifier on, high*. Reject or skip one later step to show that the gates are per step.
+## 1:49–2:33 · Live SAM outlines, HUD and scene change (wow beat)
 
-**Show:** the approval dialog, then the device state changing to on. With a smart plug, the result reads *Purifier … switched on* from `smartplug:shelly_cloud` (or the plug you use) and the purifier physically powers up. Without one, show the sandbox state and the device log.
+**Do:** in the camera sheet, turn on **Outlines**, then **Live**. Move the mouse away so no tooltip covers the picture. Wait for the baseline (time-lapse it), then open the window or let smoke drift into view.
 
-**Say:** "Nothing moves without my approval. Each step has its own gate, and approvals expire. The plug only switches power, so fan speed and mode stay with the purifier, and if the plug can't be reached it says so instead of pretending. Now it's on: an agent built on Meta models controlling a real device in my home."
+**Show:** SAM 3.1 masks for the window, door, purifier, fan, AC, vent and person on the moving picture, with the HUD (*SAM 3.1 · seg/s · latency · objects*, keyframes and running cost). *Smoke/haze: detected* turns orange, and the log shows *SAM 3.1: smoke/haze appeared → updating the plan*, then *Scene changed → plan updated*.
 
-## 2:25–2:50 · Alert card
+**Say:**
+- "With Live on, SAM 3.1 outlines the room in real time. The HUD shows segmentation speed, what's in view, and the running cost."
+- "When the window opens and smoke drifts in, SAM sees the change, and the plan updates by itself. The new device actions still wait for my approval."
 
-**Do:** tap **Air card · Muse Image**.
+SAM doesn't take a live stream: the app sends a small keyframe about every second and a half and tracks the masks in between. It only calls the model when the frame changes, and stops after 10 reads.
 
-**Show:** the "air today" card for Ikeja with Muse Image background art, the reading and the action taken. It also appears in the gallery. Then show **WhatsApp** (a prefilled message with the card image through the share sheet on phones; a `wa.me` link elsewhere), **Share** and **Download**. You pick the chat; the app never posts anything by itself.
+## 2:33–2:43 · Muse Image air card → WhatsApp
 
-**Say:** "Muse Image makes a card I can send to the family WhatsApp group in one tap. It only goes out through the share sheet or a download. Meanwhile monitoring keeps running, and Muse Spark only interrupts me when a change is worth it."
+**Do:** tap **Air card · Muse Image** (time-lapse the wait), then hover or tap **WhatsApp**.
 
-## 2:50–3:00 · Close
+**Show:** the "air today" card for Ikeja with Muse Image background art and the live reading. WhatsApp opens a prefilled share (the share sheet on phones, a `wa.me` link elsewhere). Nothing is sent until you pick a chat.
 
-**Show:** Judge mode with its capability rows (live or fallback for each endpoint), then back to the studio.
+**Say:** "Muse Image paints a shareable air card from my live reading. I can send it on WhatsApp, but nothing goes until I pick a chat."
 
-**Say:** "Muse Spark, SAM 3.1, Muse Voice Transcribe and Muse Image, each with a capability check and an honest fallback, and approval gates on every device action. It engineers your indoor air. It's not medical advice. And everything you just saw was built during this hackathon."
+## 2:43–2:49 · Judge mode
+
+**Show:** Judge mode with its capability rows (live or fallback for each endpoint) and the timeline.
+
+**Say:** "And Judge mode shows it's all live: which Meta models and endpoints are running."
+
+## 2:49–2:58 · Close
+
+**Show:** closing slide: the four Meta models, the repo, and *Device actions always wait for approval · sandbox shown in this demo · Not medical advice*.
+
+**Say:** "AirHealth Engineer. Muse Spark, SAM 3.1, Muse Voice Transcribe, and Muse Image, working together for cleaner indoor air."
 
 ---
 
-**Disclaimers to keep on screen or in the voice-over:** environment and device control only, not medical advice. Seek urgent care for severe symptoms.
+**Disclaimers to keep on screen or in the voice-over:** environment and device control only, not medical advice. Device actions always wait for approval.
