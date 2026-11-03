@@ -53,6 +53,14 @@ Live camera mode: the scene is read again only when the frame changes (synthetic
 
 ![Live camera mode](docs/screenshots/live-camera-desktop.png)
 
+Live SAM 3.1 outlines on the camera picture (synthetic test feed of a generated room on production; real SAM 3.1 masks). SAM 3.1 has no live-stream input (video tracking needs an uploaded MP4/MOV), so the app sends a 512 px keyframe every 1.5–4 s (cadence follows measured latency): all nine objects on the first frame and on a scene change, then smoke plus two rotating objects. Masks are tracked on-device between keyframes and fade when stale. Production keyframes: ~0.8–1.3 s for 3 objects, ~1.3–1.8 s for all 9. Capped at 120 keyframes / 400 SAM images (~$1) per session; paused when the tab is hidden. If SAM is down, the overlay says so and shows Muse Spark grounding boxes, labelled as boxes.
+
+![Live SAM 3.1 outlines](docs/screenshots/live-sam-desktop.png)
+
+![Smoke appears and the window changes: state chips and change log](docs/screenshots/live-sam-smoke-desktop.png)
+
+<img src="docs/screenshots/live-sam-mobile.png" width="320" alt="Live SAM 3.1 outlines on mobile" />
+
 Devices → Smart plug, with no plug connected (purifier power stays in the sandbox):
 
 <img src="docs/screenshots/devices-smart-plug-desktop.png" width="320" alt="Smart plug panel, no plug connected" />
@@ -150,6 +158,7 @@ Everything in this repo was built during the hackathon. The first commit was on 
 | Smart plug control: Shelly local RPC, Shelly Cloud and Home Assistant switch behind the approval gate, no-plug sandbox state | `7bd9bf7` | 2026-11-03 08:26 |
 | Location dead-end fix: Share-my-location card (device or city) that resumes the turn, "use my location" intent, respiratory symptoms join the sensitive group, preamble dedupe, best outdoor window from the 72-h forecast ([screens](docs/screenshots/)) | `8022f95` | 2026-11-03 09:06 |
 | Faster, consistent forecast: best outdoor window and device timeline computed in code (60-min default, profile threshold), stored per session with a stated reason when it moves; Muse Spark only phrases (low effort, 12 s timeout, late-cached); CAMS + phrasing cached per ~1 km and hour in Upstash; air-now and forecast fetched in parallel with streamed progress. Forecast step 26.9 s → 12.5 s cold / 0.8 s cached on production | `f0f476d` | 2026-11-03 10:21 |
+| Live SAM 3.1 outlines on the camera picture: keyframe segmentation (`/api/vision/live`, 9 objects, cadence from measured latency), on-device tracking and fade between keyframes, HUD (model, seg/s, latency, objects, state chips), mask changes feed the live plan flow, session and per-IP caps, labelled Muse Spark fallback. Keyframe ~0.8–1.3 s (3 objects) / ~1.3–1.8 s (9) on production | `151c7c6` `5eb7c57` | 2026-11-03 11:06 |
 
 The 3-minute demo script is in [docs/demo-script.md](docs/demo-script.md).
 

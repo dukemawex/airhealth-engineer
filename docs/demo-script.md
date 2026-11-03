@@ -36,6 +36,8 @@
 
 **Then:** flip the **Live** toggle and open the window (or move the camera). The event log shows *Scene changed → plan updated*. It only calls the model when the frame actually changes, and stops after 10 reads.
 
+**Then (wow beat):** the **Outlines** switch turns on with Live. SAM 3.1 masks for the window, door, purifier, fan, AC, vent and person appear on the moving picture with a HUD (*SAM 3.1 · seg/s · latency · objects*) and chips like *Smoke/haze: none seen*. Light a match or incense near the window (or swing to the hazy view): *Smoke/haze: detected* turns orange and the log shows *SAM 3.1: smoke/haze appeared → updating the plan*. Say: "SAM doesn't take a live stream, so we send a small keyframe about every second and a half and track the masks on the phone in between. Every outline is a real SAM mask. If SAM is down it says so and shows labelled boxes instead."
+
 **Say:** "That's a live frame from the room, not a stock image. Muse Spark reads it into a strict JSON scene, and SAM 3.1 outlines what matters. This isn't image analysis for its own sake. The scene feeds the device plan: the open window it found and the room size it estimated go straight into the engineering."
 
 ## 1:15–1:55 · Muse Spark reasons → plan timeline
