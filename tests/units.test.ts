@@ -91,6 +91,10 @@ describe("combined status", () => {
     expect(combineStatus({ session: baseSession(), aq: snap(20), ...counts }).level).toBe("watch");
     expect(combineStatus({ session: baseSession(), aq: snap(5), ...counts }).level).toBe("ok");
   });
+  it("rounds PM2.5 in the status reason", () => {
+    const c = combineStatus({ session: baseSession(), aq: snap(59.93569999999988), ...counts });
+    expect(c.reasons[0]).toContain("Outdoor PM2.5 59.9 µg/m³");
+  });
   it("escalates to urgent on red-flag symptoms and notes modelled data", () => {
     const session = baseSession({ profile: { conditions: [], symptoms: ["chest pain"] } });
     const c = combineStatus({ session, aq: snap(5, "open-meteo-cams-model"), ...counts, pendingApprovals: 1 });

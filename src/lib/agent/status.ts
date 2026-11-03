@@ -32,7 +32,7 @@ export function combineStatus(input: {
   if (pm25 !== undefined) {
     const cat = pm25Category(pm25);
     level = pm25 > threshold ? "act" : CATEGORY_RANK[cat] >= 1 ? "watch" : "ok";
-    reasons.push(`Outdoor PM2.5 ${pm25} µg/m³ (${cat.replaceAll("_", " ")})${assessment?.sensitiveGroup ? `; sensitive-group threshold ${threshold}` : ""}`);
+    reasons.push(`Outdoor PM2.5 ${Math.round(pm25 * 10) / 10} µg/m³ (${cat.replaceAll("_", " ")})${assessment?.sensitiveGroup ? `; sensitive-group threshold ${threshold}` : ""}`);
     if (aq?.source !== "openaq") reasons.push("Air data is modelled, not measured by a nearby station");
   } else if (aq) {
     reasons.push("No PM2.5 reading available for this location");
